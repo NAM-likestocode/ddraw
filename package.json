@@ -9,14 +9,19 @@
     "preview": "vite preview",
     "test": "vitest run",
     "format": "prettier --write \"src/**/*.{ts,css}\" index.html",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "tauri": "tauri"
   },
   "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-fs": "^2.5.2",
     "nanoid": "^5.1.6",
     "perfect-freehand": "^1.2.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@tauri-apps/cli": "^2.11.4",
     "prettier": "^3.9.7",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",

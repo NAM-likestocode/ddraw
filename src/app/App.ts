@@ -371,20 +371,23 @@ export class App {
     } as TextElement;
     this.store.add(el);
   }
+  loadFromString(name: string, data: string): void {
+    const scene = deserialize(data);
+    this.store.replaceScene(scene.elements, scene.files);
+    this.appState.update({
+      viewBackgroundColor: scene.appState.viewBackgroundColor,
+      gridEnabled: scene.appState.gridEnabled,
+      selectedIds: new Set(),
+    });
+    this.fileName = name.replace(/\.excalidraw$/i, '.ddraw');
+    this.store.clearHistory();
+    this.dirty = false;
+  }
   private async open(): Promise<void> {
     try {
       const result = await getPlatform().openFile();
       if (!result) return;
-      const scene = deserialize(result.data);
-      this.store.replaceScene(scene.elements, scene.files);
-      this.appState.update({
-        viewBackgroundColor: scene.appState.viewBackgroundColor,
-        gridEnabled: scene.appState.gridEnabled,
-        selectedIds: new Set(),
-      });
-      this.fileName = result.name.replace(/\.excalidraw$/, '.ddraw');
-      this.store.clearHistory();
-      this.dirty = false;
+      this.loadFromString(result.name, result.data);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Could not open file');
     }
