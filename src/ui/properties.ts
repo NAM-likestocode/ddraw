@@ -1,82 +1,258 @@
 import type { AppState, SceneStore } from '../core/store';
-import type { Element, FillStyle, StrokeStyle } from '../core/types';
+import type { Element, ElementType, StyleDefaults } from '../core/types';
 import { createId, createNonce } from '../core/ids';
+
 const colors = [
   '#D8DEE9',
+  '#B6BDCA',
+  '#818997',
+  '#171B24',
+  '#FFFFFF',
+  '#000000',
   '#CD7EBF',
   '#F17DAD',
   '#F8AB95',
-  '#58A1A5',
   '#E65B66',
   '#FF3D9F',
-  '#818997',
-  '#FFFFFF',
-  '#000000',
-  '#ef4444',
-  '#eab308',
-  '#22c55e',
-  '#3b82f6',
+  '#EAB308',
+  '#22C55E',
+  '#58A1A5',
+  '#3B82F6',
+  '#8B5CF6',
 ];
+
+type PropertyKey = keyof StyleDefaults;
+
+const segment = (
+  label: string,
+  key: PropertyKey,
+  options: Array<[string, string, string]>,
+  current: unknown,
+): string =>
+  `<section><label>${label}</label><div class="seg" role="group" aria-label="${label}">${options
+    .map(
+      ([value, icon, title]) =>
+        `<button type="button" data-key="${key}" data-value="${value}" title="${title}" aria-label="${title}" class="${String(current ?? '') === value ? 'active' : ''}">${icon}</button>`,
+    )
+    .join('')}</div></section>`;
+
 export function createProperties(
   store: SceneStore,
   state: AppState,
 ): { element: HTMLElement; refresh(): void } {
-  const el = document.createElement('aside');
-  el.className = 'properties';
+  const element = document.createElement('aside');
+  element.className = 'properties';
+
+  const selected = (): Element[] =>
+    [...state.value.selectedIds]
+      .map((id) => store.get(id))
+      .filter((item): item is Element => Boolean(item && !item.isDeleted));
+  const currentValue = (key: PropertyKey): unknown => {
+    const first = selected()[0];
+    return first && key in first ? first[key as keyof Element] : state.value.style[key];
+  };
   const apply = (key: string, value: string | number | null) => {
     const ids = state.value.selectedIds;
     if (ids.size)
-      store.update(ids, (e) => {
-        Object.assign(e, { [key]: value });
+      store.update(ids, (item) => {
+        Object.assign(item, { [key]: value });
       });
-    else state.update((s) => Object.assign(s.style, { [key]: value }));
+    else
+      state.update((appState) => {
+        Object.assign(appState.style, { [key]: value });
+      });
+    refresh();
   };
-  const swatches = (label: string, key: 'strokeColor' | 'backgroundColor') =>
-    `<label>${label}</label><div class="swatches">${colors.map((c) => `<button style="--sw:${c}" data-color="${c}" data-key="${key}" title="${c}"></button>`).join('')}<input aria-label="${label} hex" data-key="${key}" value="${state.value.style[key]}"/></div>`;
-  el.innerHTML = `${swatches('Stroke', 'strokeColor')}${swatches('Background', 'backgroundColor')}<label>Fill</label><select data-key="fillStyle"><option value="none">None</option><option value="solid">Solid</option><option value="hachure">Hachure</option><option value="cross-hatch">Cross-hatch</option></select><label>Stroke width</label><div class="seg"><button data-key="strokeWidth" data-value="1">Thin</button><button data-key="strokeWidth" data-value="2">Bold</button><button data-key="strokeWidth" data-value="4">Extra</button></div><label>Stroke style</label><select data-key="strokeStyle"><option>solid</option><option>dashed</option><option>dotted</option></select><label>Sloppiness</label><input type="range" min="0" max="2" step="1" data-key="roughness"><label>Edges</label><select data-key="roundness"><option value="round">Round</option><option value="sharp">Sharp</option></select><label>Arrowheads (start / end)</label><div class="seg"><select data-key="startArrowhead"><option value="">None</option><option value="arrow">Arrow</option><option value="bar">Bar</option><option value="dot">Dot</option></select><select data-key="endArrowhead"><option value="">None</option><option value="arrow">Arrow</option><option value="bar">Bar</option><option value="dot">Dot</option></select></div><label>Font</label><div class="seg"><select data-key="fontFamily"><option value="hand">Hand</option><option value="sans">Sans</option><option value="mono">Mono</option></select><input type="number" min="8" max="144" data-key="fontSize" value="20"></div><label>Text align</label><select data-key="textAlign"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select><label>Opacity <output>100%</output></label><input type="range" min="10" max="100" data-key="opacity"><div class="actions"><button data-action="back">⇤</button><button data-action="backward">←</button><button data-action="forward">→</button><button data-action="front">⇥</button><button data-action="duplicate">Duplicate</button><button data-action="delete">Delete</button></div>`;
-  el.addEventListener('click', (e) => {
-    const t = e.target as HTMLElement;
-    if (t.dataset.color) apply(t.dataset.key!, t.dataset.color);
-    if (t.dataset.value) apply(t.dataset.key!, Number(t.dataset.value));
-    const action = t.dataset.action;
+  const swatches = (label: string, key: 'strokeColor' | 'backgroundColor'): string => {
+    const value = String(currentValue(key));
+    return `<section class="color-section"><label>${label}</label><div class="swatches">${colors
+      .map(
+        (color) =>
+          `<button type="button" style="--sw:${color}" data-color="${color}" data-key="${key}" title="${color}" aria-label="${color}" class="${color.toLowerCase() === value.toLowerCase() ? 'active' : ''}"></button>`,
+      )
+      .join(
+        '',
+      )}</div><input class="hex-input" aria-label="${label} hex colour" data-key="${key}" value="${value}" spellcheck="false" /></section>`;
+  };
+
+  const refresh = () => {
+    const chosen = selected();
+    const types = new Set<ElementType>(
+      chosen.length ? chosen.map((item) => item.type) : [state.value.activeTool as ElementType],
+    );
+    element.hidden =
+      (state.value.activeTool === 'select' && chosen.length === 0) ||
+      state.value.activeTool === 'hand';
+    if (element.hidden) return;
+    const has = (...wanted: ElementType[]) => [...types].some((type) => wanted.includes(type));
+    const all = (predicate: (type: ElementType) => boolean) => [...types].every(predicate);
+    const fill = has('rectangle', 'ellipse', 'diamond', 'freedraw');
+    const stroked = all((type) => type !== 'text' && type !== 'image');
+    const edge = has('rectangle', 'diamond');
+    const arrow = has('arrow');
+    const text = has('text');
+    const value = (key: PropertyKey) => currentValue(key);
+
+    element.innerHTML = `${swatches('Stroke', 'strokeColor')}
+      ${
+        fill
+          ? `${swatches('Background', 'backgroundColor')}${segment(
+              'Fill',
+              'fillStyle',
+              [
+                ['none', '∅', 'No fill'],
+                ['hachure', '╱', 'Hachure'],
+                ['cross-hatch', '╳', 'Cross-hatch'],
+                ['solid', '■', 'Solid'],
+              ],
+              value('fillStyle'),
+            )}`
+          : ''
+      }
+      ${
+        stroked
+          ? `${segment(
+              'Stroke width',
+              'strokeWidth',
+              [
+                ['1', '—', 'Thin'],
+                ['2', '━', 'Medium'],
+                ['4', '▬', 'Thick'],
+              ],
+              value('strokeWidth'),
+            )}${segment(
+              'Stroke style',
+              'strokeStyle',
+              [
+                ['solid', '━', 'Solid'],
+                ['dashed', '┅', 'Dashed'],
+                ['dotted', '···', 'Dotted'],
+              ],
+              value('strokeStyle'),
+            )}`
+          : ''
+      }
+      ${
+        edge
+          ? segment(
+              'Edges',
+              'roundness',
+              [
+                ['sharp', '□', 'Sharp'],
+                ['round', '▢', 'Round'],
+              ],
+              value('roundness'),
+            )
+          : ''
+      }
+      ${
+        arrow
+          ? `<section><label>Arrowheads</label><span class="sub-label">Start</span>${segment(
+              '',
+              'startArrowhead',
+              [
+                ['', '∅', 'None'],
+                ['arrow', '←', 'Arrow'],
+                ['bar', '|', 'Bar'],
+                ['dot', '●', 'Dot'],
+              ],
+              value('startArrowhead'),
+            )}<span class="sub-label">End</span>${segment(
+              '',
+              'endArrowhead',
+              [
+                ['', '∅', 'None'],
+                ['arrow', '→', 'Arrow'],
+                ['bar', '|', 'Bar'],
+                ['dot', '●', 'Dot'],
+              ],
+              value('endArrowhead'),
+            )}</section>`
+          : ''
+      }
+      ${
+        text
+          ? `${segment(
+              'Font family',
+              'fontFamily',
+              [
+                ['hand', 'Aa', 'Hand-drawn'],
+                ['sans', 'Aa', 'Sans serif'],
+                ['mono', 'Aa', 'Monospace'],
+              ],
+              value('fontFamily'),
+            )}${segment(
+              'Font size',
+              'fontSize',
+              [
+                ['16', 'S', 'Small'],
+                ['20', 'M', 'Medium'],
+                ['28', 'L', 'Large'],
+                ['36', 'XL', 'Extra large'],
+              ],
+              value('fontSize'),
+            )}${segment(
+              'Align',
+              'textAlign',
+              [
+                ['left', '≡', 'Left'],
+                ['center', '≡', 'Centre'],
+                ['right', '≡', 'Right'],
+              ],
+              value('textAlign'),
+            )}`
+          : ''
+      }
+      <section><label>Opacity <output>${Number(value('opacity'))}%</output></label><input type="range" min="10" max="100" data-key="opacity" value="${Number(value('opacity'))}"></section>
+      ${
+        chosen.length
+          ? `<section><label>Layers</label><div class="seg layers"><button type="button" data-action="back" title="Send to back">⇤</button><button type="button" data-action="backward" title="Send backward">←</button><button type="button" data-action="forward" title="Bring forward">→</button><button type="button" data-action="front" title="Bring to front">⇥</button></div></section><div class="actions"><button type="button" data-action="duplicate">Duplicate</button><button type="button" data-action="delete" class="danger">Delete</button></div>`
+          : ''
+      }`;
+  };
+
+  element.addEventListener('click', (event) => {
+    const target = (event.target as HTMLElement).closest<HTMLButtonElement>('button');
+    if (!target) return;
+    if (target.dataset.color) apply(target.dataset.key!, target.dataset.color);
+    else if (target.dataset.value !== undefined) {
+      const key = target.dataset.key!;
+      const raw = target.dataset.value;
+      const value = key === 'strokeWidth' || key === 'fontSize' ? Number(raw) : raw || null;
+      apply(key, value);
+    }
+    const action = target.dataset.action;
     if (action === 'delete') store.remove(state.value.selectedIds);
     else if (action === 'duplicate') {
       const made: Element[] = [];
       for (const id of state.value.selectedIds) {
         const source = store.get(id);
-        if (source) {
-          const copy = structuredClone(source);
-          copy.id = createId();
-          copy.x += 20;
-          copy.y += 20;
-          copy.version = 1;
-          copy.versionNonce = createNonce();
-          store.add(copy);
-          made.push(copy);
-        }
+        if (!source) continue;
+        const copy = structuredClone(source);
+        copy.id = createId();
+        copy.x += 20;
+        copy.y += 20;
+        copy.version = 1;
+        copy.versionNonce = createNonce();
+        store.add(copy);
+        made.push(copy);
       }
       state.update({ selectedIds: new Set(made.map((item) => item.id)) });
     } else if (action)
       store.reorder(state.value.selectedIds, action as 'front' | 'back' | 'forward' | 'backward');
   });
-  el.addEventListener('input', (e) => {
-    const t = e.target as HTMLInputElement | HTMLSelectElement;
-    const key = t.dataset.key;
-    if (!key) return;
-    const value =
-      t.type === 'range' || t.type === 'number'
-        ? Number(t.value)
-        : key === 'startArrowhead' || key === 'endArrowhead'
-          ? t.value || null
-          : t.value;
-    apply(key, value);
-    if (key === 'opacity') el.querySelector('output')!.textContent = value + '%';
+  element.addEventListener('input', (event) => {
+    const target = event.target as HTMLInputElement;
+    if (target.type !== 'range' || !target.dataset.key) return;
+    apply(target.dataset.key, Number(target.value));
   });
-  const refresh = () => {
-    el.hidden =
-      (state.value.activeTool === 'select' && state.value.selectedIds.size === 0) ||
-      state.value.activeTool === 'hand';
-  };
+  element.addEventListener('change', (event) => {
+    const target = event.target as HTMLInputElement;
+    if (!target.classList.contains('hex-input') || !target.dataset.key) return;
+    if (/^#[0-9a-f]{6}$/i.test(target.value)) apply(target.dataset.key, target.value);
+    else refresh();
+  });
+
   refresh();
-  return { element: el, refresh };
+  return { element, refresh };
 }

@@ -3,7 +3,7 @@ import type { Element, FileRecord, FreeDrawElement, LinearElement } from '../cor
 export class RenderCache {
   private paths = new WeakMap<Element, Path2D>();
   private images = new Map<string, ImageBitmap>();
-  private loading = new Set<string>();
+  private loading = new Map<string, Promise<ImageBitmap | undefined>>();
   private metrics = new Map<string, TextMetrics>();
   pathFor(el: LinearElement | FreeDrawElement): Path2D {
     const old = this.paths.get(el);
@@ -45,18 +45,30 @@ export class RenderCache {
     if (!file) return;
     const cached = this.images.get(file.id);
     if (cached) return cached;
-    if (this.loading.has(file.id)) return;
-    this.loading.add(file.id);
-    fetch(file.dataURL)
-      .then((r) => r.blob())
+    void this.loadImage(file).then((bitmap) => {
+      if (bitmap) onReady();
+    });
+    return;
+  }
+  async preload(files: readonly FileRecord[]): Promise<void> {
+    await Promise.all(files.map((file) => this.loadImage(file)));
+  }
+  private loadImage(file: FileRecord): Promise<ImageBitmap | undefined> {
+    const cached = this.images.get(file.id);
+    if (cached) return Promise.resolve(cached);
+    const pending = this.loading.get(file.id);
+    if (pending) return pending;
+    const promise = fetch(file.dataURL)
+      .then((response) => response.blob())
       .then(createImageBitmap)
       .then((bitmap) => {
         this.images.set(file.id, bitmap);
-        this.loading.delete(file.id);
-        onReady();
+        return bitmap;
       })
-      .catch(() => this.loading.delete(file.id));
-    return;
+      .catch(() => undefined)
+      .finally(() => this.loading.delete(file.id));
+    this.loading.set(file.id, promise);
+    return promise;
   }
   measure(ctx: CanvasRenderingContext2D, font: string, text: string): TextMetrics {
     const key = font + '\0' + text;

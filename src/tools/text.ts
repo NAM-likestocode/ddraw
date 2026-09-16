@@ -6,17 +6,33 @@ export function editTextAt(x: number, y: number, ctx: ToolContext, existing?: Te
   const c = ctx.camera.state;
   const area = document.createElement('textarea');
   area.className = 'text-editor';
+  area.wrap = 'off';
   area.value = existing?.text ?? '';
   area.style.left = `${x * c.zoom + c.x}px`;
   area.style.top = `${y * c.zoom + c.y}px`;
-  area.style.fontSize = `${(existing?.fontSize ?? s.fontSize) * c.zoom}px`;
+  const fontSize = existing?.fontSize ?? s.fontSize;
+  const lineHeight = existing?.lineHeight ?? 1.25;
+  area.style.fontSize = `${fontSize * c.zoom}px`;
+  area.style.lineHeight = String(lineHeight);
   area.style.color = existing?.strokeColor ?? s.strokeColor;
+  area.style.textAlign = existing?.textAlign ?? s.textAlign;
   area.style.fontFamily =
     (existing?.fontFamily ?? s.fontFamily) === 'mono'
-      ? 'monospace'
+      ? 'ui-monospace, monospace'
       : (existing?.fontFamily ?? s.fontFamily) === 'hand'
         ? 'cursive'
-        : 'Inter,system-ui';
+        : 'Inter, system-ui, sans-serif';
+  const resize = () => {
+    if (existing) return;
+    const lines = area.value.split('\n');
+    area.style.width = `${Math.max(40, lines.reduce((maximum, line) => Math.max(maximum, line.length), 0) * fontSize * 0.6) * c.zoom}px`;
+    area.style.height = `${Math.max(fontSize * lineHeight, lines.length * fontSize * lineHeight) * c.zoom}px`;
+  };
+  if (existing) {
+    area.style.width = `${Math.max(40, existing.width) * c.zoom}px`;
+    area.style.height = `${Math.max(existing.fontSize * existing.lineHeight, existing.height) * c.zoom}px`;
+  } else resize();
+  area.addEventListener('input', resize);
   ctx.host.append(area);
   const commit = () => {
     area.removeEventListener('blur', commit);

@@ -20,6 +20,7 @@ import { createProperties } from '../ui/properties';
 import { createZoom } from '../ui/zoom';
 import { createShortcuts } from '../ui/shortcuts';
 import { createStats } from '../ui/stats';
+import { createExportDialog } from '../ui/exportDialog';
 import { deserialize, serialize } from '../io/file';
 import { getPlatform } from '../io/platform';
 import { insertImage } from '../io/images';
@@ -77,9 +78,21 @@ export class App {
     };
     this.toolbar = createToolbar('select', (id) => this.setTool(id));
     this.properties = createProperties(this.store, this.appState);
-    this.zoom = createZoom(this.camera, this.store, this.appState);
+    this.zoom = createZoom(
+      this.camera,
+      this.store,
+      this.appState,
+      () => this.zoomTo(this.store.getElements()),
+      () =>
+        this.zoomTo(
+          [...this.appState.value.selectedIds]
+            .map((id) => this.store.get(id))
+            .filter((item): item is Element => Boolean(item)),
+        ),
+    );
     this.shortcuts = createShortcuts();
     this.stats = createStats();
+    this.exportDialog = createExportDialog(this.store, this.appState);
     root.append(
       this.toolbar.element,
       this.menu.element,
@@ -87,6 +100,7 @@ export class App {
       this.zoom.element,
       this.stats.element,
       this.shortcuts.element,
+      this.exportDialog.element,
     );
     this.renderer.setOverlay((ctx) => this.active.render?.(ctx, this.context));
     this.bindMenu();
@@ -96,6 +110,7 @@ export class App {
     this.store.on('change', (_ids, origin) => {
       this.renderer.markDirty();
       this.zoom.refresh();
+      this.properties.refresh();
       this.stats.set(this.store.getElements().length, this.appState.value.showStats);
       if (origin === 'local') {
         this.dirty = true;
@@ -106,6 +121,7 @@ export class App {
       this.root.style.backgroundColor = this.appState.value.viewBackgroundColor;
       this.renderer.markDirty();
       this.toolbar.setActive(this.appState.value.activeTool);
+      this.toolbar.setLocked(this.appState.value.toolLocked);
       this.properties.refresh();
       this.stats.set(this.store.getElements().length, this.appState.value.showStats);
     });
@@ -116,6 +132,7 @@ export class App {
   private zoom;
   private shortcuts;
   private stats;
+  private exportDialog;
   registerMenuAction(name: MenuAction, callback: () => void): void {
     this.menu.registerAction(name, callback);
   }
@@ -123,9 +140,7 @@ export class App {
     this.registerMenuAction('open', () => void this.open());
     this.registerMenuAction('save', () => void this.save(false));
     this.registerMenuAction('saveAs', () => void this.save(true));
-    this.registerMenuAction('export', () =>
-      alert('Image export will be available in the export phase.'),
-    );
+    this.registerMenuAction('export', () => this.exportDialog.open());
     this.registerMenuAction('clear', () => {
       if (confirm('Clear the canvas?')) {
         this.store.replaceScene([]);
@@ -135,9 +150,7 @@ export class App {
     this.registerMenuAction('grid', () =>
       this.appState.update({ gridEnabled: !this.appState.value.gridEnabled }),
     );
-    this.registerMenuAction('share', () =>
-      alert('Collaboration will be available in a later phase.'),
-    );
+    this.registerMenuAction('shortcuts', () => this.shortcuts.toggle());
   }
   private setTool(id: ToolId): void {
     this.active.cancel?.(this.context);
@@ -217,6 +230,11 @@ export class App {
   }
   private keyDown(e: KeyboardEvent): void {
     const target = e.target as HTMLElement;
+    const textEditor = this.root.querySelector<HTMLElement>('.text-editor');
+    if (textEditor && e.key === 'Escape') {
+      textEditor.blur();
+      return;
+    }
     if (target.matches('textarea,input,select')) return;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
@@ -238,6 +256,16 @@ export class App {
     if (mod && key === 'y') {
       e.preventDefault();
       this.store.redo();
+      return;
+    }
+    if (mod && e.shiftKey && key === 'e') {
+      e.preventDefault();
+      this.exportDialog.open();
+      return;
+    }
+    if (mod && e.shiftKey && key === 'c') {
+      e.preventDefault();
+      void this.exportDialog.copySelection().catch(() => undefined);
       return;
     }
     if (mod && key === 's') {

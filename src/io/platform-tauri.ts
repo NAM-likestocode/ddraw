@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
-import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs';
+import { readTextFile, writeFile, writeTextFile } from '@tauri-apps/plugin-fs';
 import type { Platform } from './platform';
 
 const filters = [
@@ -29,6 +29,18 @@ export const tauriPlatform: Platform = {
     if (!path) return null;
     await writeTextFile(path, data);
     currentPath = path;
+    return fileName(path);
+  },
+
+  async saveBinary(suggestedName, data, mime) {
+    const extension = suggestedName.split('.').pop() ?? '';
+    const path = await save({
+      defaultPath: suggestedName,
+      filters: [{ name: mime, extensions: [extension] }],
+    });
+    if (!path) return null;
+    const bytes = data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data;
+    await writeFile(path, bytes);
     return fileName(path);
   },
 };

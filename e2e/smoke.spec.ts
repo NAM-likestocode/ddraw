@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -81,8 +81,8 @@ test('drawing app smoke test', async ({ page }) => {
     const textPoint = await canvasPoint(page, 760, 180);
     await page.mouse.click(textPoint.x, textPoint.y);
     await expect(page.locator('.text-editor')).toBeVisible();
-    await page.keyboard.type('hello');
-    await page.keyboard.press('Escape');
+    await page.locator('.text-editor').fill('hello');
+    await page.locator('.text-editor').press('Escape');
     await expect(page.locator('.text-editor')).toHaveCount(0);
     expect((await elements(page)).find((element) => element.text === 'hello')).toBeDefined();
   });
@@ -99,6 +99,31 @@ test('drawing app smoke test', async ({ page }) => {
     await page.keyboard.press('Control+Z');
     await page.keyboard.press('Control+Y');
     expect((await elements(page)).find((element) => element.text === 'hello')).toBeDefined();
+  });
+
+  await test.step('polished UI and PNG export work', async () => {
+    mkdirSync(dirname('e2e/artifacts/ui.png'), { recursive: true });
+    await page.keyboard.press('v');
+    const rectangle = await canvasPoint(page, 340, 240);
+    await page.mouse.click(rectangle.x, rectangle.y);
+    await expect(page.locator('.properties')).toBeVisible();
+    await page.screenshot({ path: 'e2e/artifacts/ui.png' });
+
+    await page.locator('.menu-trigger').click();
+    await page.locator('[data-action="export"]').click();
+    await expect(page.locator('.export-dialog')).toBeVisible();
+    await page.locator('[data-option="background"]').uncheck();
+    await expect(page.locator('.export-preview canvas')).toBeVisible();
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: 'e2e/artifacts/export-dialog.png' });
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.locator('[data-export="png"]').click();
+    const download = await downloadPromise;
+    const path = await download.path();
+    expect(path).not.toBeNull();
+    expect(statSync(path!).size).toBeGreaterThan(1024);
+    await page.locator('.export-dialog .close').click();
   });
 
   await test.step('stress rendering and measure panning frames', async () => {
