@@ -1,0 +1,1 @@
+export function createStats():{element:HTMLElement;set(count:number,visible:boolean):void}{const el=document.createElement('div');el.className='stats';return{element:el,set(count,visible){el.hidden=!visible;el.textContent=`${count} elements`}}}
