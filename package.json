@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
+    "server": "node server/index.js",
+    "collab:dev": "npm run build && npm run server",
     "test": "vitest run",
     "format": "prettier --write \"src/**/*.{ts,css}\" index.html",
     "test:e2e": "playwright test",
@@ -17,7 +19,10 @@
     "@tauri-apps/plugin-dialog": "^2.7.3",
     "@tauri-apps/plugin-fs": "^2.5.2",
     "nanoid": "^5.1.6",
-    "perfect-freehand": "^1.2.3"
+    "perfect-freehand": "^1.2.3",
+    "y-protocols": "^1.0.7",
+    "y-websocket": "^3.1.0",
+    "yjs": "^13.6.32"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

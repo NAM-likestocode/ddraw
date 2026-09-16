@@ -136,11 +136,12 @@ export class SceneStore {
     origin: ChangeOrigin = 'local',
   ): void {
     const before = this.snapshot();
+    const changed = new Set([...this.order, ...elements.map((element) => element.id)]);
     this.elements = new Map(elements.map((e) => [e.id, e]));
     this.order = elements.map((e) => e.id);
     this.files = { ...files };
     if (origin === 'local') this.remember(before);
-    this.emit(new Set(this.order), origin);
+    this.emit(changed, origin);
   }
   applyRemote(incoming: Element[]): void {
     const changed = new Set<string>();

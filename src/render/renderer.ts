@@ -16,6 +16,7 @@ export class Renderer {
   private interactiveDirty = true;
   private resizeObserver: ResizeObserver;
   private overlay: ((ctx: CanvasRenderingContext2D) => void) | null = null;
+  private overlays = new Set<(ctx: CanvasRenderingContext2D) => void>();
   private dpr = 1;
   constructor(
     readonly root: HTMLElement,
@@ -36,6 +37,14 @@ export class Renderer {
   }
   setOverlay(fn: ((ctx: CanvasRenderingContext2D) => void) | null): void {
     this.overlay = fn;
+    this.markDirty('interactive');
+  }
+  addOverlay(fn: (ctx: CanvasRenderingContext2D) => void): void {
+    this.overlays.add(fn);
+    this.markDirty('interactive');
+  }
+  removeOverlay(fn: (ctx: CanvasRenderingContext2D) => void): void {
+    this.overlays.delete(fn);
     this.markDirty('interactive');
   }
   markDirty(layer: DirtyLayer = 'both'): void {
@@ -166,6 +175,7 @@ export class Renderer {
       ctx.stroke();
     }
     if (this.overlay) this.overlay(ctx);
+    for (const overlay of this.overlays) overlay(ctx);
   }
   screenPoint(event: { clientX: number; clientY: number }): { x: number; y: number } {
     const r = this.interactiveCanvas.getBoundingClientRect();

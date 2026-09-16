@@ -27,12 +27,15 @@ import { insertImage } from '../io/images';
 import { base } from '../tools/helpers';
 import { createId, createNonce } from '../core/ids';
 import { selectionBounds } from '../core/geometry';
+import { CollabSession } from '../collab/collab';
+import { createShareDialog } from '../ui/shareDialog';
 const AUTOSAVE = 'ddraw.autosave.v1';
 export class App {
   readonly store = new SceneStore();
   readonly appState = new AppState(DEFAULT_APP_STATE());
   readonly camera: Camera;
   readonly renderer: Renderer;
+  readonly collab: CollabSession;
   private tools = new Map<ToolId, Tool>();
   private active: Tool;
   private context: ToolContext;
@@ -51,6 +54,7 @@ export class App {
       this.zoom?.refresh();
     });
     this.renderer = new Renderer(root, this.store, this.appState, this.camera);
+    this.collab = new CollabSession(this.store, this.appState, this.camera, this.renderer);
     for (const tool of [
       selectTool(),
       handTool(),
@@ -93,6 +97,7 @@ export class App {
     this.shortcuts = createShortcuts();
     this.stats = createStats();
     this.exportDialog = createExportDialog(this.store, this.appState);
+    this.shareDialog = createShareDialog(this.collab);
     root.append(
       this.toolbar.element,
       this.menu.element,
@@ -101,11 +106,14 @@ export class App {
       this.stats.element,
       this.shortcuts.element,
       this.exportDialog.element,
+      this.shareDialog.pill,
+      this.shareDialog.element,
     );
     this.renderer.setOverlay((ctx) => this.active.render?.(ctx, this.context));
     this.bindMenu();
     this.bindEvents();
     this.restore();
+    this.shareDialog.autoJoinFromLocation();
     this.root.style.backgroundColor = this.appState.value.viewBackgroundColor;
     this.store.on('change', (_ids, origin) => {
       this.renderer.markDirty();
@@ -133,6 +141,7 @@ export class App {
   private shortcuts;
   private stats;
   private exportDialog;
+  private shareDialog;
   registerMenuAction(name: MenuAction, callback: () => void): void {
     this.menu.registerAction(name, callback);
   }
@@ -141,6 +150,7 @@ export class App {
     this.registerMenuAction('save', () => void this.save(false));
     this.registerMenuAction('saveAs', () => void this.save(true));
     this.registerMenuAction('export', () => this.exportDialog.open());
+    this.registerMenuAction('share', () => this.shareDialog.open());
     this.registerMenuAction('clear', () => {
       if (confirm('Clear the canvas?')) {
         this.store.replaceScene([]);

@@ -446,6 +446,111 @@ button:disabled {
 .export-status.error {
   color: var(--error);
 }
+.share-pill {
+  position: absolute;
+  z-index: 8;
+  top: 14px;
+  right: 14px;
+  min-width: 72px;
+  padding: 0 12px;
+  border-color: var(--accent-dark);
+  box-shadow: 0 8px 24px #090b1066;
+}
+.share-pill.active {
+  border-color: var(--success);
+  background: #58a1a533;
+  color: #9bd3d5;
+}
+.share-card label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  color: var(--text-2);
+}
+.share-card input {
+  width: 100%;
+  height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.share-card .primary {
+  width: 100%;
+  border-color: var(--accent-dark);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.share-divider {
+  position: relative;
+  margin: 18px 0 12px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.share-divider span {
+  position: relative;
+  top: -8px;
+  padding: 0 9px;
+  background: var(--surface);
+  color: var(--text-disabled);
+  font-size: 11px;
+}
+.share-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--text-2);
+}
+.share-status i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #e0b84f;
+}
+.share-status.connected i {
+  background: var(--success);
+}
+.share-status.disconnected i {
+  background: var(--error);
+}
+.share-link {
+  display: flex;
+  gap: 6px;
+}
+.share-link input {
+  min-width: 0;
+}
+.share-link button {
+  white-space: nowrap;
+}
+.share-card h3 {
+  margin: 18px 0 8px;
+  color: var(--text-2);
+  font-size: 12px;
+}
+.share-peers {
+  display: flex;
+  min-height: 28px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.share-peer {
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--peer), transparent 45%);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--peer), transparent 82%);
+}
+.share-live > .danger {
+  width: 100%;
+  margin-top: 18px;
+  color: #f8abb8;
+}
+.share-message {
+  min-height: 17px;
+  margin: 9px 0 -8px;
+  color: var(--text-2);
+  font-size: 11px;
+}
 .text-editor {
   position: absolute;
   z-index: 8;
