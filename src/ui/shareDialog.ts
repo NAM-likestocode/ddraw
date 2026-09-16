@@ -36,7 +36,9 @@ export interface ShareDialogController {
   autoJoinFromLocation(): void;
 }
 
-export function createShareDialog(session: CollabSession): ShareDialogController {
+export function createShareDialog(
+  loadSession: () => Promise<CollabSession>,
+): ShareDialogController {
   const element = document.createElement('div');
   element.className = 'share-dialog modal';
   element.hidden = true;
@@ -72,26 +74,37 @@ export function createShareDialog(session: CollabSession): ShareDialogController
   const message = element.querySelector<HTMLElement>('.share-message')!;
   name.value = localStorage.getItem(NAME_KEY) ?? '';
   let pendingAutoLink = '';
+  let session: CollabSession | null = null;
+  let sessionPromise: Promise<CollabSession> | null = null;
 
+  const ensureSession = async (): Promise<CollabSession> => {
+    if (session) return session;
+    sessionPromise ??= loadSession();
+    session = await sessionPromise;
+    session.addEventListener('change', render);
+    render();
+    return session;
+  };
   const savedName = (): string => {
     const value = name.value.trim();
     if (!value) throw new Error('Enter your name');
     localStorage.setItem(NAME_KEY, value);
     return value;
   };
-  const connect = (serverUrl: string, roomId: string) => {
-    session.start({ serverUrl, roomId, username: savedName() });
+  const connect = async (serverUrl: string, roomId: string) => {
+    const collab = await ensureSession();
+    collab.start({ serverUrl, roomId, username: savedName() });
     pendingAutoLink = '';
     render();
   };
   const render = () => {
-    const active = session.roomId !== null;
+    const active = Boolean(session?.roomId);
     idle.hidden = active;
     live.hidden = !active;
-    const count = session.peers.length;
+    const count = session?.peers.length ?? 0;
     pill.textContent = active ? `Live · ${Math.max(1, count)}` : 'Share';
     pill.classList.toggle('active', active);
-    if (!active) return;
+    if (!active || !session) return;
     liveLink.value = shareLink(session);
     status.className = `share-status ${session.state}`;
     status.querySelector('span')!.textContent =
@@ -115,21 +128,21 @@ export function createShareDialog(session: CollabSession): ShareDialogController
   element.addEventListener('pointerdown', (event) => {
     if (event.target === element) element.hidden = true;
   });
-  element.addEventListener('click', (event) => {
+  element.addEventListener('click', async (event) => {
     const button = (event.target as HTMLElement).closest<HTMLButtonElement>('button[data-share]');
     if (!button) return;
     message.textContent = '';
     try {
-      if (button.dataset.share === 'start') connect(defaultServerUrl(), nanoid(20));
+      if (button.dataset.share === 'start') await connect(defaultServerUrl(), nanoid(20));
       else if (button.dataset.share === 'join') {
         const parsed = parseRoomLink(link.value.trim() || pendingAutoLink);
-        connect(parsed.serverUrl, parsed.roomId);
+        await connect(parsed.serverUrl, parsed.roomId);
       } else if (button.dataset.share === 'copy') {
         void navigator.clipboard
           .writeText(liveLink.value)
           .then(() => (message.textContent = 'Link copied'))
           .catch(() => (message.textContent = 'Could not copy the link'));
-      } else if (button.dataset.share === 'stop') session.stop();
+      } else if (button.dataset.share === 'stop') session?.stop();
     } catch (error) {
       message.textContent = error instanceof Error ? error.message : 'Could not join session';
     }
@@ -139,8 +152,10 @@ export function createShareDialog(session: CollabSession): ShareDialogController
     element.hidden = false;
     render();
     if (!name.value) name.focus();
+    void ensureSession().catch((error) => {
+      message.textContent = error instanceof Error ? error.message : 'Could not load collaboration';
+    });
   };
-  session.addEventListener('change', render);
 
   return {
     element,
@@ -149,6 +164,10 @@ export function createShareDialog(session: CollabSession): ShareDialogController
       element.hidden = false;
       render();
       if (!name.value) name.focus();
+      void ensureSession().catch((error) => {
+        message.textContent =
+          error instanceof Error ? error.message : 'Could not load collaboration';
+      });
     },
     close() {
       element.hidden = true;
@@ -158,18 +177,19 @@ export function createShareDialog(session: CollabSession): ShareDialogController
       if (!room) return;
       pendingAutoLink = location.href;
       link.value = pendingAutoLink;
-      if (name.value) {
-        try {
-          connect(defaultServerUrl(), room);
-        } catch (error) {
+      void ensureSession()
+        .then(async () => {
+          if (name.value) await connect(defaultServerUrl(), room);
+          else {
+            element.hidden = false;
+            message.textContent = 'Enter your name, then join the session.';
+            name.focus();
+          }
+        })
+        .catch((error) => {
           message.textContent = error instanceof Error ? error.message : 'Could not join session';
           element.hidden = false;
-        }
-      } else {
-        element.hidden = false;
-        message.textContent = 'Enter your name, then join the session.';
-        name.focus();
-      }
+        });
     },
   };
 }

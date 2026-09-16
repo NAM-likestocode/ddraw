@@ -20,9 +20,21 @@ export const selectTool = (): Tool => {
       .filter((e): e is Element => Boolean(e));
   const hit = (x: number, y: number, ctx: ToolContext) => {
     const list = ctx.store.getElements();
+    const tolerance = 6 / ctx.camera.state.zoom;
+    const pointBounds = {
+      minX: x - tolerance,
+      minY: y - tolerance,
+      maxX: x + tolerance,
+      maxY: y + tolerance,
+    };
     for (let i = list.length - 1; i >= 0; i--) {
       const e = list[i]!;
-      if (!e.locked && hitTest(e, { x, y }, 6 / ctx.camera.state.zoom)) return e;
+      if (
+        !e.locked &&
+        boundsIntersect(elementBounds(e), pointBounds) &&
+        hitTest(e, { x, y }, tolerance)
+      )
+        return e;
     }
     return null;
   };

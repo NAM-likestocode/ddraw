@@ -1,6 +1,7 @@
 import type { TextElement } from '../core/types';
 import type { Tool, ToolContext } from './types';
 import { base, world } from './helpers';
+import { fontFamily } from '../render/fonts';
 export function editTextAt(x: number, y: number, ctx: ToolContext, existing?: TextElement): void {
   const s = ctx.appState.value.style;
   const c = ctx.camera.state;
@@ -16,12 +17,7 @@ export function editTextAt(x: number, y: number, ctx: ToolContext, existing?: Te
   area.style.lineHeight = String(lineHeight);
   area.style.color = existing?.strokeColor ?? s.strokeColor;
   area.style.textAlign = existing?.textAlign ?? s.textAlign;
-  area.style.fontFamily =
-    (existing?.fontFamily ?? s.fontFamily) === 'mono'
-      ? 'ui-monospace, monospace'
-      : (existing?.fontFamily ?? s.fontFamily) === 'hand'
-        ? 'cursive'
-        : 'Inter, system-ui, sans-serif';
+  area.style.fontFamily = fontFamily(existing?.fontFamily ?? s.fontFamily);
   const resize = () => {
     if (existing) return;
     const lines = area.value.split('\n');

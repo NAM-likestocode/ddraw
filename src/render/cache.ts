@@ -1,10 +1,26 @@
 import { getStroke } from 'perfect-freehand';
-import type { Element, FileRecord, FreeDrawElement, LinearElement } from '../core/types';
+import type {
+  Element,
+  FileRecord,
+  FreeDrawElement,
+  LinearElement,
+  StrokeStyle,
+} from '../core/types';
 export class RenderCache {
   private paths = new WeakMap<Element, Path2D>();
   private images = new Map<string, ImageBitmap>();
   private loading = new Map<string, Promise<ImageBitmap | undefined>>();
   private metrics = new Map<string, TextMetrics>();
+  private lineDashes = new WeakMap<CanvasRenderingContext2D, StrokeStyle>();
+  setLineDash(ctx: CanvasRenderingContext2D, style: StrokeStyle): void {
+    if (this.lineDashes.get(ctx) === style) return;
+    if (style !== 'solid' || this.lineDashes.has(ctx))
+      ctx.setLineDash(style === 'dashed' ? [10, 8] : style === 'dotted' ? [2, 6] : []);
+    this.lineDashes.set(ctx, style);
+  }
+  resetContext(ctx: CanvasRenderingContext2D): void {
+    this.lineDashes.delete(ctx);
+  }
   pathFor(el: LinearElement | FreeDrawElement): Path2D {
     const old = this.paths.get(el);
     if (old) return old;

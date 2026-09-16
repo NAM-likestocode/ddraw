@@ -2,6 +2,7 @@ import type { Awareness } from 'y-protocols/awareness';
 import { elementBounds } from '../core/geometry';
 import type { SceneStore } from '../core/store';
 import type { Camera } from '../core/camera';
+import { fontFamily } from '../render/fonts';
 
 export interface PresenceState {
   user?: { name: string; color: string };
@@ -49,7 +50,7 @@ export function drawRemotePresence(
     ctx.lineTo(cursor.x + 16 / zoom, cursor.y + 8 / zoom);
     ctx.closePath();
     ctx.fill();
-    ctx.font = `${12 / zoom}px Inter, system-ui, sans-serif`;
+    ctx.font = `${12 / zoom}px ${fontFamily('sans')}`;
     const width = ctx.measureText(state.user.name).width + 10 / zoom;
     ctx.fillRect(cursor.x + 11 / zoom, cursor.y + 12 / zoom, width, 20 / zoom);
     ctx.fillStyle = '#fff';

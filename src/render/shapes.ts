@@ -1,5 +1,6 @@
 import type { CameraState, Element, FileRecord, LinearElement } from '../core/types';
 import { RenderCache } from './cache';
+import { fontFamily } from './fonts';
 function transform(ctx: CanvasRenderingContext2D, e: Element, c: CameraState, dpr: number): void {
   const z = c.zoom * dpr;
   const cs = Math.cos(e.angle);
@@ -61,7 +62,7 @@ export function drawElement(
   ctx.fillStyle = e.backgroundColor === 'transparent' ? 'transparent' : e.backgroundColor;
   ctx.lineJoin = e.roundness === 'round' ? 'round' : 'miter';
   ctx.lineCap = 'round';
-  ctx.setLineDash(e.strokeStyle === 'dashed' ? [10, 8] : e.strokeStyle === 'dotted' ? [2, 6] : []);
+  cache.setLineDash(ctx, e.strokeStyle);
   if (e.type === 'rectangle') {
     ctx.beginPath();
     if (e.roundness === 'round')
@@ -111,13 +112,7 @@ export function drawElement(
     ctx.fillStyle = e.strokeColor;
     ctx.fill(cache.pathFor(e));
   } else if (e.type === 'text') {
-    const family =
-      e.fontFamily === 'mono'
-        ? 'ui-monospace, monospace'
-        : e.fontFamily === 'hand'
-          ? 'cursive'
-          : 'Inter, system-ui, sans-serif';
-    ctx.font = `${e.fontSize}px ${family}`;
+    ctx.font = `${e.fontSize}px ${fontFamily(e.fontFamily)}`;
     ctx.textBaseline = 'top';
     ctx.textAlign = e.textAlign;
     ctx.fillStyle = e.strokeColor;

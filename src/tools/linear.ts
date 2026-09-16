@@ -40,6 +40,14 @@ export function linearTool(type: 'line' | 'arrow'): Tool {
     vertices.length = 0;
     ctx.finishTool();
   };
+  const cancel = (ctx: ToolContext) => {
+    if (!id) return;
+    ctx.store.remove([id]);
+    ctx.store.endHistoryGroup();
+    id = null;
+    down = false;
+    vertices.length = 0;
+  };
   return {
     id: type,
     cursor: 'crosshair',
@@ -95,10 +103,9 @@ export function linearTool(type: 'line' | 'arrow'): Tool {
       finish(ctx);
     },
     onKeyDown(e, ctx) {
-      if (e.key === 'Enter' || e.key === 'Escape') finish(ctx);
+      if (e.key === 'Enter') finish(ctx);
+      else if (e.key === 'Escape') cancel(ctx);
     },
-    cancel(ctx) {
-      finish(ctx);
-    },
+    cancel,
   };
 }

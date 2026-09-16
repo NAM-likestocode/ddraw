@@ -20,22 +20,27 @@ import { createProperties } from '../ui/properties';
 import { createZoom } from '../ui/zoom';
 import { createShortcuts } from '../ui/shortcuts';
 import { createStats } from '../ui/stats';
-import { createExportDialog } from '../ui/exportDialog';
+import type { ExportDialogController } from '../ui/exportDialog';
 import { deserialize, serialize } from '../io/file';
 import { getPlatform } from '../io/platform';
 import { insertImage } from '../io/images';
 import { base } from '../tools/helpers';
 import { createId, createNonce } from '../core/ids';
 import { selectionBounds } from '../core/geometry';
-import { CollabSession } from '../collab/collab';
-import { createShareDialog } from '../ui/shareDialog';
+import type { CollabSession } from '../collab/collab';
+import type { ShareDialogController } from '../ui/shareDialog';
+import { loadAutosaveFiles, saveAutosaveFiles } from '../io/autosaveFiles';
 const AUTOSAVE = 'ddraw.autosave.v1';
 export class App {
   readonly store = new SceneStore();
   readonly appState = new AppState(DEFAULT_APP_STATE());
   readonly camera: Camera;
   readonly renderer: Renderer;
-  readonly collab: CollabSession;
+  collab: CollabSession | null = null;
+  private collabPromise: Promise<CollabSession> | null = null;
+  private shareDialogPromise: Promise<ShareDialogController> | null = null;
+  private exportDialogPromise: Promise<ExportDialogController> | null = null;
+  private sharePill = document.createElement('button');
   private tools = new Map<ToolId, Tool>();
   private active: Tool;
   private context: ToolContext;
@@ -47,6 +52,7 @@ export class App {
   private panX = 0;
   private panY = 0;
   private fileName = 'drawing.ddraw';
+  private autosaveWarningShown = false;
   constructor(readonly root: HTMLElement) {
     root.className = 'app';
     this.camera = new Camera(this.appState.value.camera, () => {
@@ -54,7 +60,6 @@ export class App {
       this.zoom?.refresh();
     });
     this.renderer = new Renderer(root, this.store, this.appState, this.camera);
-    this.collab = new CollabSession(this.store, this.appState, this.camera, this.renderer);
     for (const tool of [
       selectTool(),
       handTool(),
@@ -96,8 +101,10 @@ export class App {
     );
     this.shortcuts = createShortcuts();
     this.stats = createStats();
-    this.exportDialog = createExportDialog(this.store, this.appState);
-    this.shareDialog = createShareDialog(this.collab);
+    this.sharePill.type = 'button';
+    this.sharePill.className = 'share-pill';
+    this.sharePill.textContent = 'Share';
+    this.sharePill.onclick = () => this.openShareDialog();
     root.append(
       this.toolbar.element,
       this.menu.element,
@@ -105,15 +112,14 @@ export class App {
       this.zoom.element,
       this.stats.element,
       this.shortcuts.element,
-      this.exportDialog.element,
-      this.shareDialog.pill,
-      this.shareDialog.element,
+      this.sharePill,
     );
     this.renderer.setOverlay((ctx) => this.active.render?.(ctx, this.context));
     this.bindMenu();
     this.bindEvents();
     this.restore();
-    this.shareDialog.autoJoinFromLocation();
+    if (new URLSearchParams(location.hash.slice(1)).has('room'))
+      void this.loadShareDialog().then((dialog) => dialog.autoJoinFromLocation());
     this.root.style.backgroundColor = this.appState.value.viewBackgroundColor;
     this.store.on('change', (_ids, origin) => {
       this.renderer.markDirty();
@@ -140,8 +146,40 @@ export class App {
   private zoom;
   private shortcuts;
   private stats;
-  private exportDialog;
-  private shareDialog;
+  private loadCollab(): Promise<CollabSession> {
+    this.collabPromise ??= import('../collab/collab').then(({ CollabSession }) => {
+      this.collab = new CollabSession(this.store, this.appState, this.camera, this.renderer);
+      return this.collab;
+    });
+    return this.collabPromise;
+  }
+  private loadShareDialog(): Promise<ShareDialogController> {
+    this.shareDialogPromise ??= import('../ui/shareDialog').then(({ createShareDialog }) => {
+      const dialog = createShareDialog(() => this.loadCollab());
+      this.sharePill.replaceWith(dialog.pill);
+      this.root.append(dialog.element);
+      return dialog;
+    });
+    return this.shareDialogPromise;
+  }
+  private openShareDialog(): void {
+    void this.loadShareDialog()
+      .then((dialog) => dialog.open())
+      .catch((error) => alert(error instanceof Error ? error.message : 'Could not load sharing'));
+  }
+  private loadExportDialog(): Promise<ExportDialogController> {
+    this.exportDialogPromise ??= import('../ui/exportDialog').then(({ createExportDialog }) => {
+      const dialog = createExportDialog(this.store, this.appState);
+      this.root.append(dialog.element);
+      return dialog;
+    });
+    return this.exportDialogPromise;
+  }
+  private openExportDialog(): void {
+    void this.loadExportDialog()
+      .then((dialog) => dialog.open())
+      .catch((error) => alert(error instanceof Error ? error.message : 'Could not load export'));
+  }
   registerMenuAction(name: MenuAction, callback: () => void): void {
     this.menu.registerAction(name, callback);
   }
@@ -149,8 +187,8 @@ export class App {
     this.registerMenuAction('open', () => void this.open());
     this.registerMenuAction('save', () => void this.save(false));
     this.registerMenuAction('saveAs', () => void this.save(true));
-    this.registerMenuAction('export', () => this.exportDialog.open());
-    this.registerMenuAction('share', () => this.shareDialog.open());
+    this.registerMenuAction('export', () => this.openExportDialog());
+    this.registerMenuAction('share', () => this.openShareDialog());
     this.registerMenuAction('clear', () => {
       if (confirm('Clear the canvas?')) {
         this.store.replaceScene([]);
@@ -178,6 +216,7 @@ export class App {
         this.panY = e.clientY;
         return;
       }
+      if (e.button !== 0) return;
       this.active.onPointerDown?.(e, this.context);
     });
     const move = (e: PointerEvent) => {
@@ -197,6 +236,7 @@ export class App {
       else this.active.onPointerUp?.(e, this.context);
     });
     canvas.addEventListener('dblclick', (e) => this.active.onDoubleClick?.(e, this.context));
+    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener(
       'wheel',
       (e) => {
@@ -245,9 +285,12 @@ export class App {
       textEditor.blur();
       return;
     }
-    if (target.matches('textarea,input,select')) return;
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
+    if (target.matches('textarea,input,select')) {
+      if (mod && key === 's') e.preventDefault();
+      return;
+    }
     if (e.code === 'Space') {
       this.space = true;
       e.preventDefault();
@@ -270,12 +313,14 @@ export class App {
     }
     if (mod && e.shiftKey && key === 'e') {
       e.preventDefault();
-      this.exportDialog.open();
+      this.openExportDialog();
       return;
     }
     if (mod && e.shiftKey && key === 'c') {
       e.preventDefault();
-      void this.exportDialog.copySelection().catch(() => undefined);
+      void this.loadExportDialog()
+        .then((dialog) => dialog.copySelection())
+        .catch(() => undefined);
       return;
     }
     if (mod && key === 's') {
@@ -361,7 +406,12 @@ export class App {
   }
   private async paste(e: ClipboardEvent): Promise<void> {
     if ((e.target as HTMLElement).matches('textarea,input')) return;
-    const image = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith('image/'));
+    const image =
+      [...(e.clipboardData?.files ?? [])].find((file) => file.type.startsWith('image/')) ??
+      [...(e.clipboardData?.items ?? [])]
+        .filter((item) => item.kind === 'file' && item.type.startsWith('image/'))
+        .map((item) => item.getAsFile())
+        .find((file): file is File => file !== null);
     if (image) {
       e.preventDefault();
       await insertImage(image, this.context);
@@ -442,13 +492,23 @@ export class App {
       alert(error instanceof Error ? error.message : 'Could not save file');
     }
   }
+  private warnAutosave(error: unknown): void {
+    if (this.autosaveWarningShown) return;
+    this.autosaveWarningShown = true;
+    console.warn('Autosave is unavailable; your drawing is still open.', error);
+  }
   private scheduleSave(): void {
     clearTimeout(this.saveTimer);
     this.saveTimer = window.setTimeout(() => {
-      localStorage.setItem(
-        AUTOSAVE,
-        serialize(this.store.getElements(true), this.appState.value, this.store.files),
-      );
+      try {
+        localStorage.setItem(
+          AUTOSAVE,
+          serialize(this.store.getElements(true), this.appState.value, {}),
+        );
+      } catch (error) {
+        this.warnAutosave(error);
+      }
+      void saveAutosaveFiles(this.store.files).catch((error) => this.warnAutosave(error));
     }, 500);
   }
   private restore(): void {
@@ -456,12 +516,22 @@ export class App {
     if (!saved) return;
     try {
       const scene = deserialize(saved);
-      this.store.replaceScene(scene.elements, scene.files, 'history');
+      this.store.replaceScene(scene.elements, {}, 'history');
       this.appState.update({
         viewBackgroundColor: scene.appState.viewBackgroundColor,
         gridEnabled: scene.appState.gridEnabled,
       });
       this.store.clearHistory();
+      void loadAutosaveFiles()
+        .then(async (files) => {
+          this.store.files = { ...files, ...scene.files };
+          this.renderer.markDirty();
+          if (Object.keys(scene.files).length) {
+            await saveAutosaveFiles(this.store.files);
+            localStorage.setItem(AUTOSAVE, serialize(scene.elements, scene.appState, {}));
+          }
+        })
+        .catch((error) => this.warnAutosave(error));
     } catch {
       localStorage.removeItem(AUTOSAVE);
     }

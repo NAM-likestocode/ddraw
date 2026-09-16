@@ -25,6 +25,8 @@ export class SceneStore {
   private elements = new Map<string, Element>();
   private order: string[] = [];
   private listeners = new Set<StoreListener>();
+  private orderedElements: Element[] | null = null;
+  private orderedElementsWithDeleted: Element[] | null = null;
   private undoStack: Snapshot[] = [];
   private redoStack: Snapshot[] = [];
   private groupBefore: Snapshot | null = null;
@@ -35,6 +37,8 @@ export class SceneStore {
     return () => this.listeners.delete(listener);
   }
   private emit(ids: Set<string>, origin: ChangeOrigin): void {
+    this.orderedElements = null;
+    this.orderedElementsWithDeleted = null;
     for (const listener of this.listeners) listener(ids, origin);
   }
   private snapshot(): Snapshot {
@@ -60,21 +64,25 @@ export class SceneStore {
     return this.elements.get(id);
   }
   getElements(includeDeleted = false): Element[] {
-    const out: Element[] = [];
+    const cached = includeDeleted ? this.orderedElementsWithDeleted : this.orderedElements;
+    if (cached) return cached;
+    const elements: Element[] = [];
     for (const id of this.order) {
-      const el = this.elements.get(id);
-      if (el && (includeDeleted || !el.isDeleted)) out.push(el);
+      const element = this.elements.get(id);
+      if (element && (includeDeleted || !element.isDeleted)) elements.push(element);
     }
-    return out;
+    if (includeDeleted) this.orderedElementsWithDeleted = elements;
+    else this.orderedElements = elements;
+    return elements;
   }
   getSnapshotForSync(): Element[] {
     return this.getElements(true);
   }
   add(element: Element, origin: ChangeOrigin = 'local'): void {
-    const before = this.snapshot();
+    const before = origin === 'local' && !this.groupBefore ? this.snapshot() : null;
     this.elements.set(element.id, element);
     if (!this.order.includes(element.id)) this.order.push(element.id);
-    if (origin === 'local') this.remember(before);
+    if (before) this.remember(before);
     this.emit(new Set([element.id]), origin);
   }
   update(
@@ -83,7 +91,7 @@ export class SceneStore {
     origin: ChangeOrigin = 'local',
   ): void {
     const list = [...ids];
-    const before = this.snapshot();
+    const before = origin === 'local' && !this.groupBefore ? this.snapshot() : null;
     const changed = new Set<string>();
     for (const id of list) {
       const old = this.elements.get(id);
@@ -97,7 +105,7 @@ export class SceneStore {
       changed.add(id);
     }
     if (!changed.size) return;
-    if (origin === 'local') this.remember(before);
+    if (before) this.remember(before);
     this.emit(changed, origin);
   }
   remove(ids: Iterable<string>): void {
@@ -106,7 +114,7 @@ export class SceneStore {
     });
   }
   reorder(ids: Iterable<string>, action: 'forward' | 'backward' | 'front' | 'back'): void {
-    const before = this.snapshot();
+    const before = this.groupBefore ? null : this.snapshot();
     const selected = new Set(ids);
     if (action === 'front')
       this.order = [
@@ -127,7 +135,7 @@ export class SceneStore {
         if (selected.has(this.order[i]!) && !selected.has(this.order[i - 1]!))
           [this.order[i], this.order[i - 1]] = [this.order[i - 1]!, this.order[i]!];
     }
-    this.remember(before);
+    if (before) this.remember(before);
     this.emit(new Set(selected), 'local');
   }
   replaceScene(
@@ -135,12 +143,12 @@ export class SceneStore {
     files: Record<string, FileRecord> = {},
     origin: ChangeOrigin = 'local',
   ): void {
-    const before = this.snapshot();
+    const before = origin === 'local' && !this.groupBefore ? this.snapshot() : null;
     const changed = new Set([...this.order, ...elements.map((element) => element.id)]);
     this.elements = new Map(elements.map((e) => [e.id, e]));
     this.order = elements.map((e) => e.id);
     this.files = { ...files };
-    if (origin === 'local') this.remember(before);
+    if (before) this.remember(before);
     this.emit(changed, origin);
   }
   applyRemote(incoming: Element[]): void {

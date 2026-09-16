@@ -54,7 +54,10 @@ export const freedrawTool = (): Tool => {
       ctx.finishTool();
     },
     cancel(ctx) {
-      if (id) ctx.store.endHistoryGroup();
+      if (id) {
+        ctx.store.remove([id]);
+        ctx.store.endHistoryGroup();
+      }
       id = null;
     },
   };

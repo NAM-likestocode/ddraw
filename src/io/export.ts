@@ -3,6 +3,7 @@ import { selectionBounds } from '../core/geometry';
 import type { Arrowhead, Element, FileRecord, FreeDrawElement, LinearElement } from '../core/types';
 import { RenderCache } from '../render/cache';
 import { drawElement } from '../render/shapes';
+import { fontFamily } from '../render/fonts';
 
 export interface ExportOptions {
   background?: string | null;
@@ -217,12 +218,7 @@ export function exportToSvg(
         `<path d="${path}" fill="${escapeXml(element.strokeColor)}" opacity="${number(element.opacity / 100)}"${rotation(element)}/>`,
       );
     } else if (element.type === 'text') {
-      const family =
-        element.fontFamily === 'mono'
-          ? 'ui-monospace, monospace'
-          : element.fontFamily === 'hand'
-            ? 'cursive'
-            : 'Inter, system-ui, sans-serif';
+      const family = fontFamily(element.fontFamily);
       const x =
         element.textAlign === 'left'
           ? element.x

@@ -18,6 +18,8 @@ export class Renderer {
   private overlay: ((ctx: CanvasRenderingContext2D) => void) | null = null;
   private overlays = new Set<(ctx: CanvasRenderingContext2D) => void>();
   private dpr = 1;
+  private width = 0;
+  private height = 0;
   constructor(
     readonly root: HTMLElement,
     private store: SceneStore,
@@ -54,6 +56,10 @@ export class Renderer {
   }
   private resize(): void {
     const rect = this.root.getBoundingClientRect();
+    if (this.width && this.height && (rect.width !== this.width || rect.height !== this.height))
+      this.camera.pan((rect.width - this.width) / 2, (rect.height - this.height) / 2);
+    this.width = rect.width;
+    this.height = rect.height;
     this.dpr = Math.max(1, devicePixelRatio || 1);
     for (const canvas of [this.staticCanvas, this.interactiveCanvas]) {
       const w = Math.max(1, Math.round(rect.width * this.dpr));
@@ -61,6 +67,9 @@ export class Renderer {
       if (canvas.width !== w || canvas.height !== h) {
         canvas.width = w;
         canvas.height = h;
+        this.cache.resetContext(
+          canvas === this.staticCanvas ? this.staticCtx : this.interactiveCtx,
+        );
         canvas.style.width = rect.width + 'px';
         canvas.style.height = rect.height + 'px';
       }
@@ -146,6 +155,7 @@ export class Renderer {
       ctx.setLineDash([5 / c.zoom, 3 / c.zoom]);
       ctx.strokeRect(b.minX, b.minY, b.maxX - b.minX, b.maxY - b.minY);
       ctx.setLineDash([]);
+      this.cache.resetContext(ctx);
       ctx.fillStyle = '#fff';
       const mx = (b.minX + b.maxX) / 2;
       const my = (b.minY + b.maxY) / 2;
