@@ -35,18 +35,22 @@ export function linearTool(type: 'line' | 'arrow'): Tool {
     if (vertices.length < 2 && preview) vertices.push(preview);
     sync(ctx, false);
     ctx.store.endHistoryGroup();
+    const finishedId = id;
     id = null;
     down = false;
     vertices.length = 0;
+    ctx.appState.update({ selectedIds: new Set([finishedId]), drawingId: null });
     ctx.finishTool();
   };
   const cancel = (ctx: ToolContext) => {
-    if (!id) return;
-    ctx.store.remove([id]);
-    ctx.store.endHistoryGroup();
-    id = null;
-    down = false;
-    vertices.length = 0;
+    if (id) {
+      ctx.store.remove([id]);
+      ctx.store.endHistoryGroup();
+      id = null;
+      down = false;
+      vertices.length = 0;
+    }
+    if (ctx.appState.value.drawingId !== null) ctx.appState.update({ drawingId: null });
   };
   return {
     id: type,
@@ -73,8 +77,8 @@ export function linearTool(type: 'line' | 'arrow'): Tool {
         } as LinearElement;
         id = el.id;
         ctx.store.beginHistoryGroup();
+        ctx.appState.update({ selectedIds: new Set(), drawingId: id });
         ctx.store.add(el);
-        ctx.appState.update({ selectedIds: new Set([id]) });
       }
       sync(ctx);
     },

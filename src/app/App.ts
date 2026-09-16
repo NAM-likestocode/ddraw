@@ -12,6 +12,7 @@ import { diamondTool } from '../tools/diamond';
 import { lineTool } from '../tools/line';
 import { arrowTool } from '../tools/arrow';
 import { freedrawTool } from '../tools/freedraw';
+import { eraserTool } from '../tools/eraser';
 import { textTool } from '../tools/text';
 import { imageTool } from '../tools/image';
 import { createToolbar } from '../ui/toolbar';
@@ -69,6 +70,7 @@ export class App {
       arrowTool(),
       lineTool(),
       freedrawTool(),
+      eraserTool(),
       textTool(),
       imageTool(),
     ]) {
@@ -121,8 +123,11 @@ export class App {
     if (new URLSearchParams(location.hash.slice(1)).has('room'))
       void this.loadShareDialog().then((dialog) => dialog.autoJoinFromLocation());
     this.root.style.backgroundColor = this.appState.value.viewBackgroundColor;
-    this.store.on('change', (_ids, origin) => {
-      this.renderer.markDirty();
+    this.store.on('change', (ids, origin) => {
+      const drawingId = this.appState.value.drawingId;
+      this.renderer.markDirty(
+        drawingId && ids.size === 1 && ids.has(drawingId) ? 'interactive' : 'both',
+      );
       this.zoom.refresh();
       this.properties.refresh();
       this.stats.set(this.store.getElements().length, this.appState.value.showStats);
@@ -384,6 +389,8 @@ export class App {
       '6': 'line',
       p: 'freedraw',
       '7': 'freedraw',
+      e: 'eraser',
+      '0': 'eraser',
       t: 'text',
       '8': 'text',
       i: 'image',

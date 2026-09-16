@@ -11,6 +11,7 @@ export type ToolId =
   | 'arrow'
   | 'line'
   | 'freedraw'
+  | 'eraser'
   | 'text'
   | 'image'
   | 'hand';
@@ -102,6 +103,7 @@ export interface AppStateData {
   activeTool: ToolId;
   toolLocked: boolean;
   selectedIds: Set<string>;
+  drawingId: string | null;
   editingId: string | null;
   camera: CameraState;
   style: StyleDefaults;
@@ -133,6 +135,7 @@ export const DEFAULT_APP_STATE = (): AppStateData => ({
   activeTool: 'select',
   toolLocked: false,
   selectedIds: new Set(),
+  drawingId: null,
   editingId: null,
   camera: { x: 0, y: 0, zoom: 1 },
   style: { ...DEFAULT_STYLE },

@@ -19,8 +19,8 @@ export const freedrawTool = (): Tool => {
       } as FreeDrawElement;
       id = el.id;
       ctx.store.beginHistoryGroup();
+      ctx.appState.update({ selectedIds: new Set(), drawingId: id });
       ctx.store.add(el);
-      ctx.appState.update({ selectedIds: new Set([id]) });
     },
     onPointerMove(e, ctx) {
       if (!id) return;
@@ -51,7 +51,7 @@ export const freedrawTool = (): Tool => {
     onPointerUp(_e, ctx) {
       if (id) ctx.store.endHistoryGroup();
       id = null;
-      ctx.finishTool();
+      ctx.appState.update({ selectedIds: new Set(), drawingId: null });
     },
     cancel(ctx) {
       if (id) {
@@ -59,6 +59,7 @@ export const freedrawTool = (): Tool => {
         ctx.store.endHistoryGroup();
       }
       id = null;
+      if (ctx.appState.value.drawingId !== null) ctx.appState.update({ drawingId: null });
     },
   };
 };

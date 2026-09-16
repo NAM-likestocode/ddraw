@@ -1,5 +1,6 @@
 import type { AppState } from '../core/store';
 import type { SceneStore } from '../core/store';
+import type { Element } from '../core/types';
 import type { Camera } from '../core/camera';
 import { boundsIntersect, elementBounds, selectionBounds } from '../core/geometry';
 import { RenderCache } from './cache';
@@ -112,8 +113,10 @@ export class Renderer {
     this.drawGrid(ctx);
     const viewport = this.viewport();
     const selected = this.appState.value.selectedIds;
+    const drawingId = this.appState.value.drawingId;
     for (const e of this.store.getElements()) {
-      if (selected.has(e.id) || !boundsIntersect(elementBounds(e), viewport)) continue;
+      if (selected.has(e.id) || e.id === drawingId || !boundsIntersect(elementBounds(e), viewport))
+        continue;
       drawElement(
         ctx,
         e,
@@ -129,21 +132,29 @@ export class Renderer {
     const ctx = this.interactiveCtx;
     this.clear(ctx);
     const viewport = this.viewport();
+    const drawingId = this.appState.value.drawingId;
+    const draw = (e: Element) =>
+      drawElement(
+        ctx,
+        e,
+        this.camera.state,
+        this.dpr,
+        this.cache,
+        this.store.files[e.type === 'image' ? e.fileId : ''],
+        () => this.markDirty('interactive'),
+      );
     const selectedEls = [];
     for (const id of this.appState.value.selectedIds) {
+      if (id === drawingId) continue;
       const e = this.store.get(id);
       if (e && !e.isDeleted && boundsIntersect(elementBounds(e), viewport)) {
         selectedEls.push(e);
-        drawElement(
-          ctx,
-          e,
-          this.camera.state,
-          this.dpr,
-          this.cache,
-          this.store.files[e.type === 'image' ? e.fileId : ''],
-          () => this.markDirty('interactive'),
-        );
+        draw(e);
       }
+    }
+    if (drawingId) {
+      const e = this.store.get(drawingId);
+      if (e && !e.isDeleted && boundsIntersect(elementBounds(e), viewport)) draw(e);
     }
     const b = selectionBounds(selectedEls);
     if (b) {

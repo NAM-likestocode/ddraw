@@ -2,23 +2,35 @@ import { mkdirSync, statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
+type DDrawElement = { type: string; text?: string; isDeleted?: boolean };
 type DDrawWindow = Window & {
   __ddraw: {
     app: {
+      appState: { value: { activeTool: string; selectedIds: Set<string> } };
       camera: { pan(dx: number, dy: number): void };
-      store: { getElements(): Array<{ type: string; text?: string }> };
+      store: { getElements(includeDeleted?: boolean): DDrawElement[] };
     };
     stress(count?: number): void;
   };
 };
 
-async function elements(page: Page): Promise<Array<{ type: string; text?: string }>> {
+async function elements(page: Page): Promise<DDrawElement[]> {
   return page.evaluate(() => {
     const ddraw = (window as unknown as DDrawWindow).__ddraw;
     return ddraw.app.store.getElements().map((element) => ({
       type: element.type,
       ...(element.type === 'text' && 'text' in element ? { text: element.text } : {}),
     }));
+  });
+}
+
+async function appState(page: Page): Promise<{ activeTool: string; selectedCount: number }> {
+  return page.evaluate(() => {
+    const ddraw = (window as unknown as DDrawWindow).__ddraw;
+    return {
+      activeTool: ddraw.app.appState.value.activeTool,
+      selectedCount: ddraw.app.appState.value.selectedIds.size,
+    };
   });
 }
 
@@ -76,6 +88,24 @@ test('drawing app smoke test', async ({ page }) => {
     await page.keyboard.press('p');
     await drag(page, [500, 320], [690, 420]);
     expect((await elements(page)).filter((element) => element.type === 'freedraw')).toHaveLength(1);
+    expect(await appState(page)).toEqual({ activeTool: 'freedraw', selectedCount: 0 });
+
+    const secondStrokeStart = await canvasPoint(page, 500, 450);
+    await page.mouse.move(secondStrokeStart.x, secondStrokeStart.y);
+    await page.mouse.down();
+    await page.mouse.move(secondStrokeStart.x + 45, secondStrokeStart.y + 18, { steps: 3 });
+    mkdirSync(dirname('e2e/artifacts/pen-midstroke.png'), { recursive: true });
+    await page.screenshot({ path: 'e2e/artifacts/pen-midstroke.png' });
+    await page.mouse.move(secondStrokeStart.x + 190, secondStrokeStart.y + 55, { steps: 5 });
+    await page.mouse.up();
+    expect((await elements(page)).filter((element) => element.type === 'freedraw')).toHaveLength(2);
+    expect(await appState(page)).toEqual({ activeTool: 'freedraw', selectedCount: 0 });
+
+    await page.keyboard.press('e');
+    await drag(page, [500, 320], [690, 420]);
+    expect((await elements(page)).filter((element) => element.type === 'freedraw')).toHaveLength(1);
+    await page.keyboard.press('Control+Z');
+    expect((await elements(page)).filter((element) => element.type === 'freedraw')).toHaveLength(2);
 
     await page.keyboard.press('t');
     const textPoint = await canvasPoint(page, 760, 180);
@@ -88,7 +118,7 @@ test('drawing app smoke test', async ({ page }) => {
   });
 
   await test.step('undo and redo restore the text element', async () => {
-    expect(await elements(page)).toHaveLength(3);
+    expect(await elements(page)).toHaveLength(4);
 
     await page.keyboard.press('Control+Z');
     expect((await elements(page)).find((element) => element.text === 'hello')).toBeUndefined();

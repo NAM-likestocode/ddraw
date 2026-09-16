@@ -77,8 +77,10 @@ export function createProperties(
 
   const refresh = () => {
     const chosen = selected();
+    const activeType: ElementType =
+      state.value.activeTool === 'freedraw' ? 'freedraw' : (state.value.activeTool as ElementType);
     const types = new Set<ElementType>(
-      chosen.length ? chosen.map((item) => item.type) : [state.value.activeTool as ElementType],
+      chosen.length ? chosen.map((item) => item.type) : [activeType],
     );
     element.hidden =
       (state.value.activeTool === 'select' && chosen.length === 0) ||

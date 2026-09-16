@@ -14,6 +14,11 @@ const tools: ToolDefinition[] = [
   ['arrow', 'A', '<path d="M2.5 10h14m-5-5l5 5-5 5"/>'],
   ['line', 'L', '<path d="M3 16L17 4"/>'],
   ['freedraw', 'P', '<path d="M3 15c3-7 4 3 7-4s3 5 7-5"/>'],
+  [
+    'eraser',
+    'E',
+    '<path d="M4 14l6.8-8.5a2 2 0 013.1-.1l2.7 2.7a2 2 0 01-.1 3.1L9.7 18H5.5a2 2 0 01-1.5-4zM8 16l-3-3"/>',
+  ],
   ['text', 'T', '<path d="M4 4h12M10 4v13M7 17h6"/>'],
   [
     'image',

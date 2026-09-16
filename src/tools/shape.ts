@@ -38,8 +38,8 @@ export function shapeTool(type: 'rectangle' | 'ellipse' | 'diamond'): Tool {
       const el = { ...base(type, start.x, start.y, ctx), type } as ShapeElement;
       id = el.id;
       ctx.store.beginHistoryGroup();
+      ctx.appState.update({ selectedIds: new Set(), drawingId: id });
       ctx.store.add(el);
-      ctx.appState.update({ selectedIds: new Set([id]) });
     },
     onPointerMove(e, ctx) {
       resize(e, ctx);
@@ -47,6 +47,7 @@ export function shapeTool(type: 'rectangle' | 'ellipse' | 'diamond'): Tool {
     onPointerUp(e, ctx) {
       resize(e, ctx);
       if (id) {
+        const finishedId = id;
         const el = ctx.store.get(id);
         if (el && Math.abs(el.width) < 3 && Math.abs(el.height) < 3)
           ctx.store.update([id], (x) => {
@@ -54,8 +55,11 @@ export function shapeTool(type: 'rectangle' | 'ellipse' | 'diamond'): Tool {
             x.height = 100;
           });
         ctx.store.endHistoryGroup();
+        id = null;
+        ctx.appState.update({ selectedIds: new Set([finishedId]), drawingId: null });
+      } else if (ctx.appState.value.drawingId !== null) {
+        ctx.appState.update({ drawingId: null });
       }
-      id = null;
       ctx.finishTool();
     },
     cancel(ctx) {
@@ -64,6 +68,7 @@ export function shapeTool(type: 'rectangle' | 'ellipse' | 'diamond'): Tool {
         ctx.store.endHistoryGroup();
         id = null;
       }
+      if (ctx.appState.value.drawingId !== null) ctx.appState.update({ drawingId: null });
     },
   };
 }
