@@ -98,6 +98,7 @@ export function drawElement(
     if (e.fillStyle !== 'none') ctx.fill();
     ctx.stroke();
   } else if (e.type === 'line' || e.type === 'arrow') {
+    ctx.translate(e.x, e.y);
     const path = cache.pathFor(e);
     ctx.stroke(path);
     const n = e.points.length;
@@ -106,6 +107,7 @@ export function drawElement(
       arrowhead(ctx, e.startArrowhead, e.points[0]!, e.points[1]!, e.strokeWidth);
     }
   } else if (e.type === 'freedraw') {
+    ctx.translate(e.x, e.y);
     ctx.fillStyle = e.strokeColor;
     ctx.fill(cache.pathFor(e));
   } else if (e.type === 'text') {

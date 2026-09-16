@@ -61,7 +61,7 @@ export function editTextAt(x: number, y: number, ctx: ToolContext, existing?: Te
       commit();
     }
   });
-  area.focus();
+  window.setTimeout(() => area.focus(), 0);
 }
 export const textTool = (): Tool => ({
   id: 'text',
