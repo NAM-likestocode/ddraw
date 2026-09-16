@@ -1,1 +1,2 @@
-import {linearTool} from './linear';export const arrowTool=()=>linearTool('arrow');
+import { linearTool } from './linear';
+export const arrowTool = () => linearTool('arrow');

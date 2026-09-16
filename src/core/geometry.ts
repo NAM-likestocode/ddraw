@@ -1,13 +1,104 @@
 import type { Element, Point } from './types';
-export interface Bounds { minX:number; minY:number; maxX:number; maxY:number }
-export function rotatePoint(x:number,y:number,cx:number,cy:number,angle:number):Point { const c=Math.cos(angle),s=Math.sin(angle),dx=x-cx,dy=y-cy; return {x:cx+dx*c-dy*s,y:cy+dx*s+dy*c}; }
-export function elementBounds(el:Element):Bounds { const x1=Math.min(el.x,el.x+el.width),x2=Math.max(el.x,el.x+el.width),y1=Math.min(el.y,el.y+el.height),y2=Math.max(el.y,el.y+el.height); if(!el.angle)return{minX:x1,minY:y1,maxX:x2,maxY:y2}; const cx=(x1+x2)/2,cy=(y1+y2)/2; const a=rotatePoint(x1,y1,cx,cy,el.angle),b=rotatePoint(x2,y1,cx,cy,el.angle),c=rotatePoint(x2,y2,cx,cy,el.angle),d=rotatePoint(x1,y2,cx,cy,el.angle); return {minX:Math.min(a.x,b.x,c.x,d.x),minY:Math.min(a.y,b.y,c.y,d.y),maxX:Math.max(a.x,b.x,c.x,d.x),maxY:Math.max(a.y,b.y,c.y,d.y)}; }
-export function boundsIntersect(a:Bounds,b:Bounds):boolean{return a.minX<=b.maxX&&a.maxX>=b.minX&&a.minY<=b.maxY&&a.maxY>=b.minY}
-function segDistance(px:number,py:number,ax:number,ay:number,bx:number,by:number):number { const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy;if(!l)return Math.hypot(px-ax,py-ay);const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l));return Math.hypot(px-(ax+t*dx),py-(ay+t*dy)); }
-export function hitTest(el:Element,p:Point,tolerance=5):boolean { if(el.isDeleted)return false; const cx=el.x+el.width/2,cy=el.y+el.height/2,q=rotatePoint(p.x,p.y,cx,cy,-el.angle),lx=q.x-el.x,ly=q.y-el.y,w=el.width,h=el.height;
- if(el.type==='line'||el.type==='arrow'||el.type==='freedraw'){const pts=el.points;for(let i=1;i<pts.length;i++){const a=pts[i-1]!,b=pts[i]!;if(segDistance(lx,ly,a[0],a[1],b[0],b[1])<=tolerance+el.strokeWidth/2)return true;}return false;}
- if(el.type==='ellipse'){const rx=Math.abs(w)/2,ry=Math.abs(h)/2;if(!rx||!ry)return false;const v=((lx-w/2)/rx)**2+((ly-h/2)/ry)**2;return el.fillStyle!=='none'?v<=1:Math.abs(v-1)<=tolerance/Math.max(rx,ry)*2;}
- if(el.type==='diamond'){const v=Math.abs((lx-w/2)/(w/2||1))+Math.abs((ly-h/2)/(h/2||1));return el.fillStyle!=='none'?v<=1:Math.abs(v-1)<tolerance/Math.min(Math.abs(w),Math.abs(h))*2;}
- const inside=lx>=-tolerance&&lx<=w+tolerance&&ly>=-tolerance&&ly<=h+tolerance; if(el.type==='text'||el.type==='image'||el.fillStyle!=='none')return inside; return inside&&(lx<=tolerance||lx>=w-tolerance||ly<=tolerance||ly>=h-tolerance);
+export interface Bounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
 }
-export function selectionBounds(elements:readonly Element[]):Bounds|null {if(!elements.length)return null;let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;for(const e of elements){const b=elementBounds(e);minX=Math.min(minX,b.minX);minY=Math.min(minY,b.minY);maxX=Math.max(maxX,b.maxX);maxY=Math.max(maxY,b.maxY);}return{minX,minY,maxX,maxY};}
+export function rotatePoint(x: number, y: number, cx: number, cy: number, angle: number): Point {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const dx = x - cx;
+  const dy = y - cy;
+  return { x: cx + dx * c - dy * s, y: cy + dx * s + dy * c };
+}
+export function elementBounds(el: Element): Bounds {
+  const x1 = Math.min(el.x, el.x + el.width);
+  const x2 = Math.max(el.x, el.x + el.width);
+  const y1 = Math.min(el.y, el.y + el.height);
+  const y2 = Math.max(el.y, el.y + el.height);
+  if (!el.angle) return { minX: x1, minY: y1, maxX: x2, maxY: y2 };
+  const cx = (x1 + x2) / 2;
+  const cy = (y1 + y2) / 2;
+  const a = rotatePoint(x1, y1, cx, cy, el.angle);
+  const b = rotatePoint(x2, y1, cx, cy, el.angle);
+  const c = rotatePoint(x2, y2, cx, cy, el.angle);
+  const d = rotatePoint(x1, y2, cx, cy, el.angle);
+  return {
+    minX: Math.min(a.x, b.x, c.x, d.x),
+    minY: Math.min(a.y, b.y, c.y, d.y),
+    maxX: Math.max(a.x, b.x, c.x, d.x),
+    maxY: Math.max(a.y, b.y, c.y, d.y),
+  };
+}
+export function boundsIntersect(a: Bounds, b: Bounds): boolean {
+  return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY;
+}
+function segDistance(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const l = dx * dx + dy * dy;
+  if (!l) return Math.hypot(px - ax, py - ay);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+export function hitTest(el: Element, p: Point, tolerance = 5): boolean {
+  if (el.isDeleted) return false;
+  const cx = el.x + el.width / 2;
+  const cy = el.y + el.height / 2;
+  const q = rotatePoint(p.x, p.y, cx, cy, -el.angle);
+  const lx = q.x - el.x;
+  const ly = q.y - el.y;
+  const w = el.width;
+  const h = el.height;
+  if (el.type === 'line' || el.type === 'arrow' || el.type === 'freedraw') {
+    const pts = el.points;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1]!;
+      const b = pts[i]!;
+      if (segDistance(lx, ly, a[0], a[1], b[0], b[1]) <= tolerance + el.strokeWidth / 2)
+        return true;
+    }
+    return false;
+  }
+  if (el.type === 'ellipse') {
+    const rx = Math.abs(w) / 2;
+    const ry = Math.abs(h) / 2;
+    if (!rx || !ry) return false;
+    const v = ((lx - w / 2) / rx) ** 2 + ((ly - h / 2) / ry) ** 2;
+    return el.fillStyle !== 'none' ? v <= 1 : Math.abs(v - 1) <= (tolerance / Math.max(rx, ry)) * 2;
+  }
+  if (el.type === 'diamond') {
+    const v = Math.abs((lx - w / 2) / (w / 2 || 1)) + Math.abs((ly - h / 2) / (h / 2 || 1));
+    return el.fillStyle !== 'none'
+      ? v <= 1
+      : Math.abs(v - 1) < (tolerance / Math.min(Math.abs(w), Math.abs(h))) * 2;
+  }
+  const inside = lx >= -tolerance && lx <= w + tolerance && ly >= -tolerance && ly <= h + tolerance;
+  if (el.type === 'text' || el.type === 'image' || el.fillStyle !== 'none') return inside;
+  return (
+    inside && (lx <= tolerance || lx >= w - tolerance || ly <= tolerance || ly >= h - tolerance)
+  );
+}
+export function selectionBounds(elements: readonly Element[]): Bounds | null {
+  if (!elements.length) return null;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const e of elements) {
+    const b = elementBounds(e);
+    minX = Math.min(minX, b.minX);
+    minY = Math.min(minY, b.minY);
+    maxX = Math.max(maxX, b.maxX);
+    maxY = Math.max(maxY, b.maxY);
+  }
+  return { minX, minY, maxX, maxY };
+}

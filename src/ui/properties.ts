@@ -1,4 +1,82 @@
-import type {AppState,SceneStore} from '../core/store';import type {Element,FillStyle,StrokeStyle} from '../core/types';import {createId,createNonce} from '../core/ids';
-const colors=['#D8DEE9','#CD7EBF','#F17DAD','#F8AB95','#58A1A5','#E65B66','#FF3D9F','#818997','#FFFFFF','#000000','#ef4444','#eab308','#22c55e','#3b82f6'];
-export function createProperties(store:SceneStore,state:AppState):{element:HTMLElement;refresh():void}{const el=document.createElement('aside');el.className='properties';const apply=(key:string,value:string|number|null)=>{const ids=state.value.selectedIds;if(ids.size)store.update(ids,e=>{Object.assign(e,{[key]:value})});else state.update(s=>Object.assign(s.style,{[key]:value}))};const swatches=(label:string,key:'strokeColor'|'backgroundColor')=>`<label>${label}</label><div class="swatches">${colors.map(c=>`<button style="--sw:${c}" data-color="${c}" data-key="${key}" title="${c}"></button>`).join('')}<input aria-label="${label} hex" data-key="${key}" value="${state.value.style[key]}"/></div>`;el.innerHTML=`${swatches('Stroke','strokeColor')}${swatches('Background','backgroundColor')}<label>Fill</label><select data-key="fillStyle"><option value="none">None</option><option value="solid">Solid</option><option value="hachure">Hachure</option><option value="cross-hatch">Cross-hatch</option></select><label>Stroke width</label><div class="seg"><button data-key="strokeWidth" data-value="1">Thin</button><button data-key="strokeWidth" data-value="2">Bold</button><button data-key="strokeWidth" data-value="4">Extra</button></div><label>Stroke style</label><select data-key="strokeStyle"><option>solid</option><option>dashed</option><option>dotted</option></select><label>Sloppiness</label><input type="range" min="0" max="2" step="1" data-key="roughness"><label>Edges</label><select data-key="roundness"><option value="round">Round</option><option value="sharp">Sharp</option></select><label>Arrowheads (start / end)</label><div class="seg"><select data-key="startArrowhead"><option value="">None</option><option value="arrow">Arrow</option><option value="bar">Bar</option><option value="dot">Dot</option></select><select data-key="endArrowhead"><option value="">None</option><option value="arrow">Arrow</option><option value="bar">Bar</option><option value="dot">Dot</option></select></div><label>Font</label><div class="seg"><select data-key="fontFamily"><option value="hand">Hand</option><option value="sans">Sans</option><option value="mono">Mono</option></select><input type="number" min="8" max="144" data-key="fontSize" value="20"></div><label>Text align</label><select data-key="textAlign"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select><label>Opacity <output>100%</output></label><input type="range" min="10" max="100" data-key="opacity"><div class="actions"><button data-action="back">⇤</button><button data-action="backward">←</button><button data-action="forward">→</button><button data-action="front">⇥</button><button data-action="duplicate">Duplicate</button><button data-action="delete">Delete</button></div>`;
- el.addEventListener('click',e=>{const t=e.target as HTMLElement;if(t.dataset.color)apply(t.dataset.key!,t.dataset.color);if(t.dataset.value)apply(t.dataset.key!,Number(t.dataset.value));const action=t.dataset.action;if(action==='delete')store.remove(state.value.selectedIds);else if(action==='duplicate'){const made:Element[]=[];for(const id of state.value.selectedIds){const source=store.get(id);if(source){const copy=structuredClone(source);copy.id=createId();copy.x+=20;copy.y+=20;copy.version=1;copy.versionNonce=createNonce();store.add(copy);made.push(copy)}}state.update({selectedIds:new Set(made.map(item=>item.id))})}else if(action)store.reorder(state.value.selectedIds,action as 'front'|'back'|'forward'|'backward')});el.addEventListener('input',e=>{const t=e.target as HTMLInputElement|HTMLSelectElement,key=t.dataset.key;if(!key)return;const value=t.type==='range'||t.type==='number'?Number(t.value):(key==='startArrowhead'||key==='endArrowhead')?(t.value||null):t.value;apply(key,value);if(key==='opacity')el.querySelector('output')!.textContent=value+'%'});const refresh=()=>{el.hidden=state.value.activeTool==='select'&&state.value.selectedIds.size===0||state.value.activeTool==='hand';};refresh();return{element:el,refresh}}
+import type { AppState, SceneStore } from '../core/store';
+import type { Element, FillStyle, StrokeStyle } from '../core/types';
+import { createId, createNonce } from '../core/ids';
+const colors = [
+  '#D8DEE9',
+  '#CD7EBF',
+  '#F17DAD',
+  '#F8AB95',
+  '#58A1A5',
+  '#E65B66',
+  '#FF3D9F',
+  '#818997',
+  '#FFFFFF',
+  '#000000',
+  '#ef4444',
+  '#eab308',
+  '#22c55e',
+  '#3b82f6',
+];
+export function createProperties(
+  store: SceneStore,
+  state: AppState,
+): { element: HTMLElement; refresh(): void } {
+  const el = document.createElement('aside');
+  el.className = 'properties';
+  const apply = (key: string, value: string | number | null) => {
+    const ids = state.value.selectedIds;
+    if (ids.size)
+      store.update(ids, (e) => {
+        Object.assign(e, { [key]: value });
+      });
+    else state.update((s) => Object.assign(s.style, { [key]: value }));
+  };
+  const swatches = (label: string, key: 'strokeColor' | 'backgroundColor') =>
+    `<label>${label}</label><div class="swatches">${colors.map((c) => `<button style="--sw:${c}" data-color="${c}" data-key="${key}" title="${c}"></button>`).join('')}<input aria-label="${label} hex" data-key="${key}" value="${state.value.style[key]}"/></div>`;
+  el.innerHTML = `${swatches('Stroke', 'strokeColor')}${swatches('Background', 'backgroundColor')}<label>Fill</label><select data-key="fillStyle"><option value="none">None</option><option value="solid">Solid</option><option value="hachure">Hachure</option><option value="cross-hatch">Cross-hatch</option></select><label>Stroke width</label><div class="seg"><button data-key="strokeWidth" data-value="1">Thin</button><button data-key="strokeWidth" data-value="2">Bold</button><button data-key="strokeWidth" data-value="4">Extra</button></div><label>Stroke style</label><select data-key="strokeStyle"><option>solid</option><option>dashed</option><option>dotted</option></select><label>Sloppiness</label><input type="range" min="0" max="2" step="1" data-key="roughness"><label>Edges</label><select data-key="roundness"><option value="round">Round</option><option value="sharp">Sharp</option></select><label>Arrowheads (start / end)</label><div class="seg"><select data-key="startArrowhead"><option value="">None</option><option value="arrow">Arrow</option><option value="bar">Bar</option><option value="dot">Dot</option></select><select data-key="endArrowhead"><option value="">None</option><option value="arrow">Arrow</option><option value="bar">Bar</option><option value="dot">Dot</option></select></div><label>Font</label><div class="seg"><select data-key="fontFamily"><option value="hand">Hand</option><option value="sans">Sans</option><option value="mono">Mono</option></select><input type="number" min="8" max="144" data-key="fontSize" value="20"></div><label>Text align</label><select data-key="textAlign"><option value="left">Left</option><option value="center">Center</option><option value="right">Right</option></select><label>Opacity <output>100%</output></label><input type="range" min="10" max="100" data-key="opacity"><div class="actions"><button data-action="back">⇤</button><button data-action="backward">←</button><button data-action="forward">→</button><button data-action="front">⇥</button><button data-action="duplicate">Duplicate</button><button data-action="delete">Delete</button></div>`;
+  el.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    if (t.dataset.color) apply(t.dataset.key!, t.dataset.color);
+    if (t.dataset.value) apply(t.dataset.key!, Number(t.dataset.value));
+    const action = t.dataset.action;
+    if (action === 'delete') store.remove(state.value.selectedIds);
+    else if (action === 'duplicate') {
+      const made: Element[] = [];
+      for (const id of state.value.selectedIds) {
+        const source = store.get(id);
+        if (source) {
+          const copy = structuredClone(source);
+          copy.id = createId();
+          copy.x += 20;
+          copy.y += 20;
+          copy.version = 1;
+          copy.versionNonce = createNonce();
+          store.add(copy);
+          made.push(copy);
+        }
+      }
+      state.update({ selectedIds: new Set(made.map((item) => item.id)) });
+    } else if (action)
+      store.reorder(state.value.selectedIds, action as 'front' | 'back' | 'forward' | 'backward');
+  });
+  el.addEventListener('input', (e) => {
+    const t = e.target as HTMLInputElement | HTMLSelectElement;
+    const key = t.dataset.key;
+    if (!key) return;
+    const value =
+      t.type === 'range' || t.type === 'number'
+        ? Number(t.value)
+        : key === 'startArrowhead' || key === 'endArrowhead'
+          ? t.value || null
+          : t.value;
+    apply(key, value);
+    if (key === 'opacity') el.querySelector('output')!.textContent = value + '%';
+  });
+  const refresh = () => {
+    el.hidden =
+      (state.value.activeTool === 'select' && state.value.selectedIds.size === 0) ||
+      state.value.activeTool === 'hand';
+  };
+  refresh();
+  return { element: el, refresh };
+}

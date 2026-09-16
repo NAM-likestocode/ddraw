@@ -1,2 +1,69 @@
-import type { ShapeElement } from '../core/types';import type { Tool,ToolContext } from './types';import {base,world} from './helpers';
-export function shapeTool(type:'rectangle'|'ellipse'|'diamond'):Tool{let start={x:0,y:0},id:string|null=null;function resize(e:PointerEvent,ctx:ToolContext):void{if(!id)return;const p=world(e,ctx),dx=p.x-start.x,dy=p.y-start.y;let w=dx,h=dy;if(e.shiftKey){const size=Math.max(Math.abs(dx),Math.abs(dy));w=Math.sign(dx||1)*size;h=Math.sign(dy||1)*size}ctx.store.update([id],el=>{if(e.altKey){el.x=start.x-w;el.y=start.y-h;el.width=w*2;el.height=h*2}else{el.x=start.x;el.y=start.y;el.width=w;el.height=h}})}return{id:type,cursor:'crosshair',onPointerDown(e,ctx){start=world(e,ctx);const el={...base(type,start.x,start.y,ctx),type} as ShapeElement;id=el.id;ctx.store.beginHistoryGroup();ctx.store.add(el);ctx.appState.update({selectedIds:new Set([id])})},onPointerMove(e,ctx){resize(e,ctx)},onPointerUp(e,ctx){resize(e,ctx);if(id){const el=ctx.store.get(id);if(el&&Math.abs(el.width)<3&&Math.abs(el.height)<3)ctx.store.update([id],x=>{x.width=100;x.height=100});ctx.store.endHistoryGroup()}id=null;ctx.finishTool()},cancel(ctx){if(id){ctx.store.remove([id]);ctx.store.endHistoryGroup();id=null}}}}
+import type { ShapeElement } from '../core/types';
+import type { Tool, ToolContext } from './types';
+import { base, world } from './helpers';
+export function shapeTool(type: 'rectangle' | 'ellipse' | 'diamond'): Tool {
+  let start = { x: 0, y: 0 };
+  let id: string | null = null;
+  function resize(e: PointerEvent, ctx: ToolContext): void {
+    if (!id) return;
+    const p = world(e, ctx);
+    const dx = p.x - start.x;
+    const dy = p.y - start.y;
+    let w = dx;
+    let h = dy;
+    if (e.shiftKey) {
+      const size = Math.max(Math.abs(dx), Math.abs(dy));
+      w = Math.sign(dx || 1) * size;
+      h = Math.sign(dy || 1) * size;
+    }
+    ctx.store.update([id], (el) => {
+      if (e.altKey) {
+        el.x = start.x - w;
+        el.y = start.y - h;
+        el.width = w * 2;
+        el.height = h * 2;
+      } else {
+        el.x = start.x;
+        el.y = start.y;
+        el.width = w;
+        el.height = h;
+      }
+    });
+  }
+  return {
+    id: type,
+    cursor: 'crosshair',
+    onPointerDown(e, ctx) {
+      start = world(e, ctx);
+      const el = { ...base(type, start.x, start.y, ctx), type } as ShapeElement;
+      id = el.id;
+      ctx.store.beginHistoryGroup();
+      ctx.store.add(el);
+      ctx.appState.update({ selectedIds: new Set([id]) });
+    },
+    onPointerMove(e, ctx) {
+      resize(e, ctx);
+    },
+    onPointerUp(e, ctx) {
+      resize(e, ctx);
+      if (id) {
+        const el = ctx.store.get(id);
+        if (el && Math.abs(el.width) < 3 && Math.abs(el.height) < 3)
+          ctx.store.update([id], (x) => {
+            x.width = 100;
+            x.height = 100;
+          });
+        ctx.store.endHistoryGroup();
+      }
+      id = null;
+      ctx.finishTool();
+    },
+    cancel(ctx) {
+      if (id) {
+        ctx.store.remove([id]);
+        ctx.store.endHistoryGroup();
+        id = null;
+      }
+    },
+  };
+}

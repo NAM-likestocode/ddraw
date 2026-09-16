@@ -1,2 +1,34 @@
-import type {Camera} from '../core/camera';import type {SceneStore,AppState} from '../core/store';
-export function createZoom(camera:Camera,store:SceneStore,state:AppState):{element:HTMLElement;refresh():void}{const el=document.createElement('div');el.className='zoom-bar';const undo=document.createElement('button'),redo=document.createElement('button'),minus=document.createElement('button'),value=document.createElement('button'),plus=document.createElement('button');undo.textContent='↶';redo.textContent='↷';minus.textContent='−';plus.textContent='+';value.className='zoom-value';minus.onclick=()=>camera.zoomAt(1/1.2,innerWidth/2,innerHeight/2);plus.onclick=()=>camera.zoomAt(1.2,innerWidth/2,innerHeight/2);value.onclick=()=>camera.reset();undo.onclick=()=>store.undo();redo.onclick=()=>store.redo();el.append(undo,redo,minus,value,plus);const refresh=()=>{value.textContent=Math.round(camera.state.zoom*100)+'%';undo.disabled=!store.canUndo();redo.disabled=!store.canRedo();void state};refresh();return{element:el,refresh}}
+import type { Camera } from '../core/camera';
+import type { SceneStore, AppState } from '../core/store';
+export function createZoom(
+  camera: Camera,
+  store: SceneStore,
+  state: AppState,
+): { element: HTMLElement; refresh(): void } {
+  const el = document.createElement('div');
+  el.className = 'zoom-bar';
+  const undo = document.createElement('button');
+  const redo = document.createElement('button');
+  const minus = document.createElement('button');
+  const value = document.createElement('button');
+  const plus = document.createElement('button');
+  undo.textContent = '↶';
+  redo.textContent = '↷';
+  minus.textContent = '−';
+  plus.textContent = '+';
+  value.className = 'zoom-value';
+  minus.onclick = () => camera.zoomAt(1 / 1.2, innerWidth / 2, innerHeight / 2);
+  plus.onclick = () => camera.zoomAt(1.2, innerWidth / 2, innerHeight / 2);
+  value.onclick = () => camera.reset();
+  undo.onclick = () => store.undo();
+  redo.onclick = () => store.redo();
+  el.append(undo, redo, minus, value, plus);
+  const refresh = () => {
+    value.textContent = Math.round(camera.state.zoom * 100) + '%';
+    undo.disabled = !store.canUndo();
+    redo.disabled = !store.canRedo();
+    void state;
+  };
+  refresh();
+  return { element: el, refresh };
+}

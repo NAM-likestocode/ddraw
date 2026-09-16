@@ -1,3 +1,45 @@
-import {describe,expect,it} from 'vitest';import {elementBounds,hitTest,rotatePoint} from './geometry';import type {ShapeElement} from './types';
-const rect=(patch:Partial<ShapeElement>={}):ShapeElement=>({id:'a',type:'rectangle',x:0,y:0,width:100,height:50,angle:0,strokeColor:'#fff',backgroundColor:'transparent',fillStyle:'solid',strokeWidth:2,strokeStyle:'solid',roughness:0,opacity:100,roundness:'sharp',seed:1,version:1,versionNonce:1,isDeleted:false,groupIds:[],locked:false,...patch});
-describe('geometry',()=>{it('rotates a point',()=>{const p=rotatePoint(1,0,0,0,Math.PI/2);expect(p.x).toBeCloseTo(0);expect(p.y).toBeCloseTo(1)});it('computes rotated AABB',()=>{const b=elementBounds(rect({angle:Math.PI/2}));expect(b.minX).toBeCloseTo(25);expect(b.maxX).toBeCloseTo(75);expect(b.minY).toBeCloseTo(-25);expect(b.maxY).toBeCloseTo(75)});it('hit tests rotation and fill',()=>{expect(hitTest(rect({angle:Math.PI/2}),{x:50,y:25})).toBe(true);expect(hitTest(rect({fillStyle:'none'}),{x:50,y:25})).toBe(false)})});
+import { describe, expect, it } from 'vitest';
+import { elementBounds, hitTest, rotatePoint } from './geometry';
+import type { ShapeElement } from './types';
+const rect = (patch: Partial<ShapeElement> = {}): ShapeElement => ({
+  id: 'a',
+  type: 'rectangle',
+  x: 0,
+  y: 0,
+  width: 100,
+  height: 50,
+  angle: 0,
+  strokeColor: '#fff',
+  backgroundColor: 'transparent',
+  fillStyle: 'solid',
+  strokeWidth: 2,
+  strokeStyle: 'solid',
+  roughness: 0,
+  opacity: 100,
+  roundness: 'sharp',
+  seed: 1,
+  version: 1,
+  versionNonce: 1,
+  isDeleted: false,
+  groupIds: [],
+  locked: false,
+  ...patch,
+});
+describe('geometry', () => {
+  it('rotates a point', () => {
+    const p = rotatePoint(1, 0, 0, 0, Math.PI / 2);
+    expect(p.x).toBeCloseTo(0);
+    expect(p.y).toBeCloseTo(1);
+  });
+  it('computes rotated AABB', () => {
+    const b = elementBounds(rect({ angle: Math.PI / 2 }));
+    expect(b.minX).toBeCloseTo(25);
+    expect(b.maxX).toBeCloseTo(75);
+    expect(b.minY).toBeCloseTo(-25);
+    expect(b.maxY).toBeCloseTo(75);
+  });
+  it('hit tests rotation and fill', () => {
+    expect(hitTest(rect({ angle: Math.PI / 2 }), { x: 50, y: 25 })).toBe(true);
+    expect(hitTest(rect({ fillStyle: 'none' }), { x: 50, y: 25 })).toBe(false);
+  });
+});

@@ -1,3 +1,66 @@
-import {describe,expect,it} from 'vitest';import {SceneStore} from './store';import type {ShapeElement} from './types';
-const el=(version=1,nonce=10):ShapeElement=>({id:'x',type:'rectangle',x:0,y:0,width:10,height:10,angle:0,strokeColor:'#fff',backgroundColor:'transparent',fillStyle:'none',strokeWidth:1,strokeStyle:'solid',roughness:0,opacity:100,roundness:'sharp',seed:1,version,versionNonce:nonce,isDeleted:false,groupIds:[],locked:false});
-describe('store',()=>{it('undoes and redoes immutable updates',()=>{const s=new SceneStore();s.add(el());s.update(['x'],e=>{e.x=20});expect(s.get('x')?.x).toBe(20);s.undo();expect(s.get('x')?.x).toBe(0);s.redo();expect(s.get('x')?.x).toBe(20)});it('groups drag history',()=>{const s=new SceneStore();s.add(el());s.clearHistory();s.beginHistoryGroup();s.update(['x'],e=>{e.x=1});s.update(['x'],e=>{e.x=2});s.endHistoryGroup();s.undo();expect(s.get('x')?.x).toBe(0)});it('merges version then lower nonce',()=>{const s=new SceneStore();s.add(el());s.clearHistory();s.applyRemote([{...el(1,20),x:2}]);expect(s.get('x')?.x).toBe(0);s.applyRemote([{...el(1,5),x:3}]);expect(s.get('x')?.x).toBe(3);s.applyRemote([{...el(2,99),x:4}]);expect(s.get('x')?.x).toBe(4)})});
+import { describe, expect, it } from 'vitest';
+import { SceneStore } from './store';
+import type { ShapeElement } from './types';
+const el = (version = 1, nonce = 10): ShapeElement => ({
+  id: 'x',
+  type: 'rectangle',
+  x: 0,
+  y: 0,
+  width: 10,
+  height: 10,
+  angle: 0,
+  strokeColor: '#fff',
+  backgroundColor: 'transparent',
+  fillStyle: 'none',
+  strokeWidth: 1,
+  strokeStyle: 'solid',
+  roughness: 0,
+  opacity: 100,
+  roundness: 'sharp',
+  seed: 1,
+  version,
+  versionNonce: nonce,
+  isDeleted: false,
+  groupIds: [],
+  locked: false,
+});
+describe('store', () => {
+  it('undoes and redoes immutable updates', () => {
+    const s = new SceneStore();
+    s.add(el());
+    s.update(['x'], (e) => {
+      e.x = 20;
+    });
+    expect(s.get('x')?.x).toBe(20);
+    s.undo();
+    expect(s.get('x')?.x).toBe(0);
+    s.redo();
+    expect(s.get('x')?.x).toBe(20);
+  });
+  it('groups drag history', () => {
+    const s = new SceneStore();
+    s.add(el());
+    s.clearHistory();
+    s.beginHistoryGroup();
+    s.update(['x'], (e) => {
+      e.x = 1;
+    });
+    s.update(['x'], (e) => {
+      e.x = 2;
+    });
+    s.endHistoryGroup();
+    s.undo();
+    expect(s.get('x')?.x).toBe(0);
+  });
+  it('merges version then lower nonce', () => {
+    const s = new SceneStore();
+    s.add(el());
+    s.clearHistory();
+    s.applyRemote([{ ...el(1, 20), x: 2 }]);
+    expect(s.get('x')?.x).toBe(0);
+    s.applyRemote([{ ...el(1, 5), x: 3 }]);
+    expect(s.get('x')?.x).toBe(3);
+    s.applyRemote([{ ...el(2, 99), x: 4 }]);
+    expect(s.get('x')?.x).toBe(4);
+  });
+});
