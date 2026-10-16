@@ -118,7 +118,12 @@ export class Renderer {
     const drawingId = this.appState.value.drawingId;
     const visible = this.store.getElements();
     this.worldTransform(ctx);
-    drawMindmaps(ctx, visible, this.store);
+    drawMindmaps(
+      ctx,
+      visible,
+      (id) => this.store.get(id),
+      () => this.store.getElements(true),
+    );
     this.cache.resetContext(ctx);
     for (const e of visible) {
       if (selected.has(e.id) || e.id === drawingId || !boundsIntersect(elementBounds(e), viewport))

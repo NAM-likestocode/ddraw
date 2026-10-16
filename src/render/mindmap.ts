@@ -1,6 +1,40 @@
 import type { Element } from '../core/types';
-import type { SceneStore } from '../core/store';
+import { sketchBranch } from './sketch';
 import { branchCurve, collapseButton, isNode, type MindmapNode } from '../core/mindmap';
+
+export interface Branch {
+  /** SVG path data in scene coordinates. */
+  d: string;
+  color: string;
+  width: number;
+  opacity: number;
+}
+
+/** The branch lines joining each node in `nodes` to its parent. */
+export function branchesOf(
+  nodes: readonly Element[],
+  get: (id: string) => Element | undefined,
+): Branch[] {
+  const out: Branch[] = [];
+  for (const node of nodes) {
+    if (!isNode(node) || !node.mindmap.parentId) continue;
+    const parent = get(node.mindmap.parentId);
+    if (!isNode(parent)) continue;
+    const curve = branchCurve(parent, node);
+    const width = parent.mindmap.parentId === null ? 3 : 2;
+    const [a, b, c, d] = curve.map((p) => `${p.x} ${p.y}`);
+    out.push({
+      d:
+        node.roughness > 0
+          ? sketchBranch(curve, width, node.roughness, node.seed)
+          : `M ${a} C ${b} ${c} ${d}`,
+      color: node.mindmap.color || node.strokeColor,
+      width,
+      opacity: node.opacity / 100,
+    });
+  }
+  return out;
+}
 
 /**
  * Draws the curved branch lines of every mind map in `visible`, under the
@@ -9,31 +43,24 @@ import { branchCurve, collapseButton, isNode, type MindmapNode } from '../core/m
 export function drawMindmaps(
   ctx: CanvasRenderingContext2D,
   visible: readonly Element[],
-  store: SceneStore,
+  get: (id: string) => Element | undefined,
+  all: () => readonly Element[] = () => visible,
 ): void {
   const nodes = visible.filter(isNode);
   if (!nodes.length) return;
-  const all = store.getElements(true);
   ctx.save();
   ctx.lineCap = 'round';
-  for (const node of nodes) {
-    const parentId = node.mindmap.parentId;
-    if (!parentId) continue;
-    const parent = store.get(parentId);
-    if (!isNode(parent) || parent.isDeleted) continue;
-    const [a, b, c, d] = branchCurve(parent, node);
-    ctx.strokeStyle = node.mindmap.color || node.strokeColor;
-    ctx.globalAlpha = node.opacity / 100;
-    ctx.lineWidth = parent.mindmap.parentId === null ? 3 : 2;
-    ctx.beginPath();
-    ctx.moveTo(a.x, a.y);
-    ctx.bezierCurveTo(b.x, b.y, c.x, c.y, d.x, d.y);
-    ctx.stroke();
+  ctx.lineJoin = 'round';
+  for (const branch of branchesOf(nodes, get)) {
+    ctx.strokeStyle = branch.color;
+    ctx.globalAlpha = branch.opacity;
+    ctx.lineWidth = branch.width;
+    ctx.stroke(new Path2D(branch.d));
   }
   ctx.globalAlpha = 1;
   for (const node of nodes) {
     if (!node.mindmap.collapsed) continue;
-    const count = hiddenCount(node, all);
+    const count = hiddenCount(node, all());
     if (count) drawBadge(ctx, node, count);
   }
   ctx.restore();

@@ -195,3 +195,30 @@ function toSketchPaths(drawable: Drawable): SketchPath[] {
     return { d, stroke: o.fill ?? 'none', strokeWidth: o.fillWeight, fill: 'none', dashed: false };
   });
 }
+
+const branchPaths = new Map<string, string>();
+
+/** Hand-drawn path data for a mind-map branch curve (start, two control points, end). */
+export function sketchBranch(
+  curve: readonly { x: number; y: number }[],
+  strokeWidth: number,
+  roughness: number,
+  seed: number,
+): string {
+  const [a, b, c, d] = curve.map((p) => `${p.x.toFixed(1)} ${p.y.toFixed(1)}`);
+  const path = `M ${a} C ${b} ${c} ${d}`;
+  const key = `${path}|${strokeWidth}|${roughness}|${seed}`;
+  let out = branchPaths.get(key);
+  if (out === undefined) {
+    const drawable = generator.path(path, {
+      seed: seed || 1,
+      roughness,
+      strokeWidth,
+      preserveVertices: true,
+    });
+    out = drawable.sets.map((set) => generator.opsToPath(set, DECIMALS)).join(' ');
+    if (branchPaths.size > 2000) branchPaths.clear();
+    branchPaths.set(key, out);
+  }
+  return out;
+}

@@ -6,6 +6,9 @@ import { drawElement } from '../render/shapes';
 import { sketchFor } from '../render/sketch';
 import type { Sketch } from '../render/sketch';
 import { fontFamily } from '../render/fonts';
+import { drawLabel } from '../render/label';
+import { branchesOf, drawMindmaps } from '../render/mindmap';
+import { LINE_HEIGHT, labelLines } from '../core/text';
 
 export interface ExportOptions {
   background?: string | null;
@@ -50,6 +53,10 @@ export async function exportToCanvas(
     y: (metrics.padding - metrics.bounds.minY) * metrics.scale,
     zoom: metrics.scale,
   };
+  const byId = new Map(elements.map((element) => [element.id, element]));
+  const worldTransform = () => ctx.setTransform(camera.zoom, 0, 0, camera.zoom, camera.x, camera.y);
+  worldTransform();
+  drawMindmaps(ctx, elements, (id) => byId.get(id));
   for (const element of elements) {
     drawElement(
       ctx,
@@ -60,6 +67,13 @@ export async function exportToCanvas(
       files[element.type === 'image' ? element.fileId : ''],
       () => undefined,
     );
+    if (
+      (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'diamond') &&
+      element.label?.text
+    ) {
+      worldTransform();
+      drawLabel(ctx, element);
+    }
   }
   return canvas;
 }
@@ -190,6 +204,11 @@ export function exportToSvg(
     body.push(
       `<rect x="${number(viewX)}" y="${number(viewY)}" width="${number(viewWidth)}" height="${number(viewHeight)}" fill="${escapeXml(options.background)}"/>`,
     );
+  const byId = new Map(elements.map((element) => [element.id, element]));
+  for (const branch of branchesOf(elements, (id) => byId.get(id)))
+    body.push(
+      `<path d="${branch.d}" fill="none" stroke="${escapeXml(branch.color)}" stroke-width="${branch.width}" stroke-linecap="round" stroke-linejoin="round" opacity="${number(branch.opacity)}"/>`,
+    );
 
   for (const element of elements) {
     const sketch = sketchFor(element);
@@ -248,6 +267,25 @@ export function exportToSvg(
       const file = files[element.fileId];
       body.push(
         `<image x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}" href="${escapeXml(file?.dataURL ?? '')}" opacity="${number(element.opacity / 100)}"${rotation(element)}/>`,
+      );
+    }
+    if (
+      (element.type === 'rectangle' || element.type === 'ellipse' || element.type === 'diamond') &&
+      element.label?.text
+    ) {
+      const label = element.label;
+      const lines = labelLines(element);
+      const lineHeight = label.fontSize * LINE_HEIGHT;
+      const cx = element.x + element.width / 2;
+      const top = element.y + element.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+      const spans = lines
+        .map(
+          (line, i) =>
+            `<tspan x="${number(cx)}" y="${number(top + i * lineHeight)}">${escapeXml(line)}</tspan>`,
+        )
+        .join('');
+      body.push(
+        `<text font-family="${escapeXml(fontFamily(label.fontFamily))}" font-size="${number(label.fontSize)}" text-anchor="middle" dominant-baseline="central" fill="${escapeXml(element.strokeColor)}" opacity="${number(element.opacity / 100)}"${rotation(element)}>${spans}</text>`,
       );
     }
   }
