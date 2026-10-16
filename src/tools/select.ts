@@ -27,6 +27,7 @@ import {
 import { addChildNode, addSiblingNode, renameNode } from './mindmap';
 import { dot, highlight, signButton, worldTransform } from './overlay';
 import { snapBounds, type Guide } from './snapping';
+import { duplicateElements } from '../core/duplicate';
 const CLIP = 'ddraw-elements:';
 type Mode = 'none' | 'drag' | 'marquee' | 'resize' | 'rotate' | 'endpoint' | 'connect';
 type Direction = 'right' | 'down' | 'left' | 'up';
@@ -152,21 +153,17 @@ export const selectTool = (): Tool => {
     return null;
   };
   const duplicate = (ctx: ToolContext) => {
-    const made: Element[] = [];
-    for (const e of selected(ctx)) {
-      const copy = structuredClone(e);
-      copy.id = createId();
-      copy.x += 20;
-      copy.y += 20;
-      copy.version = 1;
-      copy.versionNonce = createNonce();
-      copy.groupIds = [];
-      if (isShape(copy)) delete copy.mindmap;
-      if (isLinear(copy)) copy.startBinding = copy.endBinding = null;
-      ctx.store.add(copy);
-      made.push(copy);
-    }
-    ctx.appState.update({ selectedIds: new Set(made.map((e) => e.id)) });
+    const source = [...dragSet(ctx)]
+      .map((id) => ctx.store.get(id))
+      .filter((e): e is Element => Boolean(e && !e.isDeleted));
+    const made = duplicateElements(source);
+    ctx.store.beginHistoryGroup();
+    for (const copy of made) ctx.store.add(copy);
+    ctx.store.endHistoryGroup();
+    const picked = new Set(ctx.appState.value.selectedIds);
+    ctx.appState.update({
+      selectedIds: new Set(made.filter((_, i) => picked.has(source[i]!.id)).map((e) => e.id)),
+    });
   };
   /** The selection plus the branches below any selected mind-map nodes. */
   const dragSet = (ctx: ToolContext): Set<string> => {
