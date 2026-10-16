@@ -43,6 +43,8 @@ export function createStyleBar(
   state: AppState,
   camera: Camera,
   actions: { more(): void; duplicate(): void; remove(): void },
+  /** True while another popup (the right-click menu) owns the selection. */
+  covered: () => boolean = () => false,
 ): { element: HTMLElement; refresh(): void } {
   const element = document.createElement('div');
   element.className = 'style-bar';
@@ -133,6 +135,7 @@ export function createStyleBar(
     const v = state.value;
     const hide =
       busy ||
+      covered() ||
       !list.length ||
       v.activeTool !== 'select' ||
       v.editingId !== null ||

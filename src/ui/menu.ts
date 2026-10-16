@@ -18,6 +18,7 @@ const items: MenuItem[] = [
 export interface MenuController {
   element: HTMLElement;
   registerAction(name: MenuAction, callback: () => void): void;
+  run(name: MenuAction): void;
 }
 
 export function createMenu(): MenuController {
@@ -55,7 +56,7 @@ export function createMenu(): MenuController {
     panel.append(button);
   }
   const footer = document.createElement('footer');
-  footer.textContent = 'Ddraw · v0.1.0';
+  footer.textContent = `Ddraw · v${__APP_VERSION__}`;
   panel.append(footer);
   trigger.onclick = () => (panel.hidden = !panel.hidden);
   wrap.append(trigger, panel);
@@ -68,6 +69,9 @@ export function createMenu(): MenuController {
       actions.set(name, callback);
       const button = panel.querySelector<HTMLButtonElement>(`[data-action="${name}"]`);
       if (button) button.hidden = false;
+    },
+    run(name) {
+      actions.get(name)?.();
     },
   };
 }

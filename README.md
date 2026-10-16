@@ -9,16 +9,36 @@ Inspired by [Excalidraw](https://excalidraw.com), built from scratch on a plain 
 **Drawing**
 
 - Rectangles, diamonds, ellipses, arrows, lines, freehand pen strokes, text, and images
-- Solid or transparent fills, with a handwritten font for text
+- Hand-drawn ("Sketchy") look, or switch any shape to Clean, precise lines
+- No fill, hatched, cross-hatched, or solid fills, with a handwritten font for text
 - Stroke color, width, and style (solid, dashed, dotted), opacity, rounded or sharp corners
 - Arrowheads (arrow, bar, dot) on either end of lines and arrows
 - Eraser tool, and a pen that stays active for continuous sketching
 
-**Editing**
+**Mind maps**
 
+- Press `M` and click to start a map, then `Tab` adds a child topic and `Enter` adds a sibling
+- Topics lay themselves out automatically, with a colour per branch
+- Collapse or expand a branch with the button next to its topic
+- Drag a topic onto another to move it, along with everything under it
+- Move between topics with the arrow keys, and press `F2` to rename
+
+**Connecting and editing**
+
+- Double-click any shape to write text inside it
+- Arrows attach to shapes and follow them when they move
+- Hover a selected shape and click a `+` to add a connected copy in one step
+- Shapes snap to each other's edges and centres while you drag (hold `Alt` to turn it off)
+- Duplicate (`Ctrl+D`) and copy/paste keep arrows, groups, and mind-map branches connected
+- Right-click for the actions that fit what you clicked, including align and distribute
+- Press `Ctrl+K` to search every command by name and run it from the keyboard
 - Select, move, resize, rotate, group, and lock elements
 - Undo/redo, infinite canvas with pan and zoom, optional grid
-- Contextual properties panel that only shows options relevant to the selection
+
+**Styling**
+
+- A small style bar floats above the selection: colour presets, fill, Sketchy/Clean, and stroke width
+- Open the full properties panel from the bar when you need every option
 
 **Files and export**
 
@@ -77,8 +97,8 @@ Installers are written to `src-tauri/target/release/bundle/`: NSIS and MSI on Wi
 Releases are built automatically by GitHub Actions. Bump `version` in `package.json` and `src-tauri/tauri.conf.json`, commit, then push a matching tag:
 
 ```sh
-git tag v0.2.0
-git push origin v0.2.0
+git tag v2.0.0
+git push origin v2.0.0
 ```
 
 The workflow builds Windows and Linux installers and publishes them as a GitHub release.
@@ -111,6 +131,15 @@ See [`server/README.md`](server/README.md) for configuration, reverse-proxy, and
 | `A` / `L` / `P`       | Arrow / line / pen            |
 | `E` / `0`             | Eraser                        |
 | `T` / `I` / `H`       | Text / image / hand           |
+| `M`                   | Mind map                      |
+| `Tab` / `Enter`       | Add child / sibling topic     |
+| `F2` or double-click  | Write text in a shape         |
+| `Ctrl+K`              | Search all commands           |
+| Right-click           | Quick actions menu            |
+| `Ctrl+D`              | Duplicate                     |
+| `Ctrl+Shift+]` / `[`  | Bring to front / send to back |
+| `Alt` + drag          | Move without snapping         |
+| `Ctrl` + draw arrow   | Arrow that doesn't attach     |
 | `Space` + drag        | Pan                           |
 | `Ctrl` + wheel        | Zoom                          |
 | `Ctrl+Z`              | Undo                          |
@@ -141,10 +170,10 @@ On macOS, use `Cmd` instead of `Ctrl`.
 ```
 src/
   app/       App setup and wiring
-  core/      Scene store, geometry, camera, element types
-  render/    Canvas renderer, shape drawing, render cache
+  core/      Scene store, geometry, camera, element types, mind-map layout
+  render/    Canvas renderer, hand-drawn shapes, mind-map branches
   tools/     One file per drawing tool
-  ui/        Toolbar, menu, properties panel, dialogs, theme
+  ui/        Toolbar, style bar, menu, properties panel, dialogs, theme
   io/        File open/save, export, images, platform adapters
   collab/    Real-time sync and live cursors (Yjs)
 server/      Collaboration server and Dockerfile
@@ -158,4 +187,6 @@ e2e/         Playwright browser tests
 - [Tauri 2](https://tauri.app) for the desktop app
 - [Yjs](https://yjs.dev) for real-time collaboration
 - [perfect-freehand](https://github.com/steveruizok/perfect-freehand) for pen strokes
+- [Rough.js](https://roughjs.com) for the hand-drawn look
+- [Lucide](https://lucide.dev) icons
 - [Vitest](https://vitest.dev) and [Playwright](https://playwright.dev) for testing

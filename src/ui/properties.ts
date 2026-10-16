@@ -40,7 +40,7 @@ const segment = (
 export function createProperties(
   store: SceneStore,
   state: AppState,
-): { element: HTMLElement; refresh(): void; toggleDetails(): void } {
+): { element: HTMLElement; refresh(): void; toggleDetails(open?: boolean): void } {
   const element = document.createElement('aside');
   element.className = 'properties';
   // With a selection, the full panel only opens on request; the style bar covers the basics.
@@ -268,8 +268,8 @@ export function createProperties(
   });
 
   refresh();
-  const toggleDetails = () => {
-    details = !details;
+  const toggleDetails = (open = !details) => {
+    details = open;
     refresh();
   };
   return { element, refresh, toggleDetails };

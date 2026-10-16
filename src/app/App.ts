@@ -1,6 +1,6 @@
 import { AppState, SceneStore } from '../core/store';
 import { DEFAULT_APP_STATE } from '../core/types';
-import type { Element, ShapeElement, TextElement, ToolId } from '../core/types';
+import type { Element, Point, ShapeElement, TextElement, ToolId } from '../core/types';
 import { Camera } from '../core/camera';
 import { Renderer } from '../render/renderer';
 import type { Tool, ToolContext } from '../tools/types';
@@ -21,7 +21,10 @@ import { createToolbar } from '../ui/toolbar';
 import { createMenu, type MenuAction } from '../ui/menu';
 import { createProperties } from '../ui/properties';
 import { createStyleBar } from '../ui/styleBar';
-import { deleteSelection, duplicateSelection } from '../core/selection';
+import { deleteSelection, duplicateSelection, elementAt, pasteElements } from '../core/selection';
+import { createActions, type Action } from './actions';
+import { createContextMenu } from '../ui/contextMenu';
+import { createPalette } from '../ui/palette';
 import { createZoom } from '../ui/zoom';
 import { createShortcuts } from '../ui/shortcuts';
 import { createStats } from '../ui/stats';
@@ -96,11 +99,28 @@ export class App {
     };
     this.toolbar = createToolbar('select', (id) => this.setTool(id));
     this.properties = createProperties(this.store, this.appState);
-    this.styleBar = createStyleBar(this.store, this.appState, this.camera, {
-      more: () => this.properties.toggleDetails(),
-      duplicate: () => duplicateSelection(this.store, this.appState),
-      remove: () => deleteSelection(this.store, this.appState),
+    this.styleBar = createStyleBar(
+      this.store,
+      this.appState,
+      this.camera,
+      {
+        more: () => this.properties.toggleDetails(),
+        duplicate: () => duplicateSelection(this.store, this.appState),
+        remove: () => deleteSelection(this.store, this.appState),
+      },
+      () => this.contextMenu?.isOpen ?? false,
+    );
+    this.actions = createActions({
+      ctx: this.context,
+      setTool: (id) => this.setTool(id),
+      menu: (name) => this.menu.run(name),
+      zoomToFit: () => this.zoomTo(this.store.getElements()),
+      zoomToSelection: () => this.zoomTo(this.selectedElements()),
+      paste: (text, at) => this.pasteText(text, at),
+      styleDetails: () => this.properties.toggleDetails(true),
     });
+    this.contextMenu = createContextMenu(() => this.styleBar.refresh());
+    this.palette = createPalette(() => this.actions);
     this.zoom = createZoom(
       this.camera,
       this.store,
@@ -128,6 +148,8 @@ export class App {
       this.stats.element,
       this.shortcuts.element,
       this.sharePill,
+      this.contextMenu.element,
+      this.palette.element,
     );
     this.renderer.setOverlay((ctx) => this.active.render?.(ctx, this.context));
     this.bindMenu();
@@ -164,6 +186,9 @@ export class App {
   private toolbar;
   private properties;
   private styleBar;
+  private actions: Action[];
+  private contextMenu;
+  private palette;
   private zoom;
   private shortcuts;
   private stats;
@@ -257,7 +282,10 @@ export class App {
       else this.active.onPointerUp?.(e, this.context);
     });
     canvas.addEventListener('dblclick', (e) => this.active.onDoubleClick?.(e, this.context));
-    canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    canvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.openContextMenu(e);
+    });
     canvas.addEventListener(
       'wheel',
       (e) => {
@@ -299,6 +327,34 @@ export class App {
         this.appState.update({ toolLocked: !this.appState.value.toolLocked }),
       );
   }
+  private selectedElements(): Element[] {
+    return [...this.appState.value.selectedIds]
+      .map((id) => this.store.get(id))
+      .filter((x): x is Element => Boolean(x && !x.isDeleted));
+  }
+  private runAction(id: string): void {
+    const action = this.actions.find((a) => a.id === id);
+    if (action && (action.enabled?.() ?? true)) action.run();
+  }
+  /** Right-click: picks what is under the pointer, then lists what can be done with it. */
+  private openContextMenu(e: MouseEvent): void {
+    if (this.appState.value.editingId || this.appState.value.drawingId) return;
+    if (this.active.id !== 'select') this.setTool('select');
+    const screen = this.renderer.screenPoint(e);
+    const at = this.camera.screenToWorld(screen);
+    const hit = elementAt(this.store, at, 6 / this.camera.state.zoom);
+    const ids = this.appState.value.selectedIds;
+    if (hit && !ids.has(hit.id)) this.appState.update({ selectedIds: new Set([hit.id]) });
+    else if (!hit && ids.size) {
+      const b = selectionBounds(this.selectedElements());
+      const inside = b && at.x >= b.minX && at.x <= b.maxX && at.y >= b.minY && at.y <= b.maxY;
+      if (!inside) this.appState.update({ selectedIds: new Set() });
+    }
+    const target = this.appState.value.selectedIds.size ? 'selection' : 'canvas';
+    const list = this.actions.filter((a) => a.menu === target && (a.enabled?.() ?? true));
+    const host = this.root.getBoundingClientRect();
+    this.contextMenu.open(e.clientX - host.left, e.clientY - host.top, list, at);
+  }
   private keyDown(e: KeyboardEvent): void {
     const target = e.target as HTMLElement;
     const textEditor = this.root.querySelector<HTMLElement>('.text-editor');
@@ -310,6 +366,17 @@ export class App {
     const key = e.key.toLowerCase();
     if (target.matches('textarea,input,select')) {
       if (mod && key === 's') e.preventDefault();
+      return;
+    }
+    if (mod && key === 'k') {
+      e.preventDefault();
+      this.active.cancel?.(this.context);
+      this.palette.open();
+      return;
+    }
+    if (mod && e.shiftKey && (e.code === 'BracketRight' || e.code === 'BracketLeft')) {
+      e.preventDefault();
+      this.runAction(e.code === 'BracketRight' ? 'front' : 'back');
       return;
     }
     if (e.code === 'Space') {
@@ -374,11 +441,7 @@ export class App {
       return;
     }
     if (e.shiftKey && e.key === '2') {
-      this.zoomTo(
-        [...this.appState.value.selectedIds]
-          .map((id) => this.store.get(id))
-          .filter((x): x is Element => Boolean(x)),
-      );
+      this.zoomTo(this.selectedElements());
       return;
     }
     if (e.key === '?') {
@@ -444,30 +507,17 @@ export class App {
     const text = e.clipboardData?.getData('text/plain') ?? '';
     if (!text) return;
     e.preventDefault();
-    if (text.startsWith('ddraw-elements:')) {
-      try {
-        const incoming = JSON.parse(text.slice(15)) as Element[];
-        const ids: string[] = [];
-        for (const source of incoming) {
-          const copy = structuredClone(source);
-          copy.id = createId();
-          copy.x += 20;
-          copy.y += 20;
-          copy.version = 1;
-          copy.versionNonce = createNonce();
-          this.store.add(copy);
-          ids.push(copy.id);
-        }
-        this.appState.update({ selectedIds: new Set(ids) });
-        return;
-      } catch {
-        /* paste as text */
-      }
-    }
-    const p = this.camera.screenToWorld({
-      x: this.root.clientWidth / 2,
-      y: this.root.clientHeight / 2,
-    });
+    this.pasteText(text);
+  }
+  /** Pastes copied elements, or the text as a new text element in the middle of the view. */
+  pasteText(text: string, at?: Point): void {
+    if (pasteElements(this.store, this.appState, text, at)) return;
+    const p =
+      at ??
+      this.camera.screenToWorld({
+        x: this.root.clientWidth / 2,
+        y: this.root.clientHeight / 2,
+      });
     const s = this.appState.value.style;
     const el = {
       ...base('text', p.x, p.y, this.context),

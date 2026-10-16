@@ -26,8 +26,12 @@ import {
 import { addChildNode, addSiblingNode, renameNode } from './mindmap';
 import { dot, highlight, signButton, worldTransform } from './overlay';
 import { snapBounds, type Guide } from './snapping';
-import { deleteSelection, duplicateSelection, withBranches } from '../core/selection';
-const CLIP = 'ddraw-elements:';
+import {
+  deleteSelection,
+  duplicateSelection,
+  selectionToClipboard,
+  withBranches,
+} from '../core/selection';
 type Mode = 'none' | 'drag' | 'marquee' | 'resize' | 'rotate' | 'endpoint' | 'connect';
 type Direction = 'right' | 'down' | 'left' | 'up';
 const DIRECTIONS: Direction[] = ['right', 'down', 'left', 'up'];
@@ -569,12 +573,12 @@ export const selectTool = (): Tool => {
         e.preventDefault();
         duplicateSelection(ctx.store, ctx.appState);
       } else if (mod && e.key.toLowerCase() === 'c') {
-        const elements = selected(ctx);
-        void navigator.clipboard?.writeText(CLIP + JSON.stringify(elements));
+        const text = selectionToClipboard(ctx.store, ctx.appState);
+        if (text) void navigator.clipboard?.writeText(text);
       } else if (mod && e.key.toLowerCase() === 'x') {
-        const elements = selected(ctx);
-        void navigator.clipboard?.writeText(CLIP + JSON.stringify(elements));
-        ctx.store.remove(ids);
+        const text = selectionToClipboard(ctx.store, ctx.appState);
+        if (text) void navigator.clipboard?.writeText(text);
+        deleteSelection(ctx.store, ctx.appState);
       } else if (mod && e.key.toLowerCase() === 'g') {
         if (e.shiftKey)
           ctx.store.update(ids, (el) => {
