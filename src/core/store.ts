@@ -1,5 +1,6 @@
 import type { AppStateData, Element, FileRecord } from './types';
 import { createNonce } from './ids';
+import { hiddenByCollapse } from './mindmap';
 export type ChangeOrigin = 'local' | 'remote' | 'history';
 type StoreListener = (changedIds: Set<string>, origin: ChangeOrigin) => void;
 type StateListener = (state: Readonly<AppStateData>) => void;
@@ -41,6 +42,8 @@ export class SceneStore {
   private undoStack: HistoryEntry[] = [];
   private redoStack: HistoryEntry[] = [];
   private open: OpenEntry | null = null;
+  private deriver: ((changed: Set<string>) => void) | null = null;
+  private deriving = false;
   files: Record<string, FileRecord> = {};
   on(event: 'change', listener: StoreListener): () => void {
     void event;
@@ -83,9 +86,25 @@ export class SceneStore {
   }
   /** Runs a local change, recording it as its own undo step unless a group is open. */
   private record(ids: Iterable<string>, change: () => void): void {
-    const opened = this.track(ids);
+    const list = new Set(ids);
+    const opened = this.track(list);
     change();
+    if (this.deriver && !this.deriving) {
+      this.deriving = true;
+      try {
+        this.deriver(list);
+      } finally {
+        this.deriving = false;
+      }
+    }
     if (opened) this.commit();
+  }
+  /**
+   * Registers follow-up edits for local changes (e.g. attached arrows following
+   * a moved shape). They run inside the same undo step.
+   */
+  setDeriver(deriver: ((changed: Set<string>) => void) | null): void {
+    this.deriver = deriver;
   }
   beginHistoryGroup(): void {
     if (this.open) this.open.grouped = true;
@@ -97,13 +116,19 @@ export class SceneStore {
   get(id: string): Element | undefined {
     return this.elements.get(id);
   }
+  /**
+   * Elements in stacking order. By default this is what is on the canvas: deleted
+   * elements and mind-map nodes inside a collapsed branch are left out.
+   */
   getElements(includeDeleted = false): Element[] {
     const cached = includeDeleted ? this.orderedElementsWithDeleted : this.orderedElements;
     if (cached) return cached;
     const elements: Element[] = [];
+    const hidden = includeDeleted ? null : hiddenByCollapse(this.elements);
     for (const id of this.order) {
       const element = this.elements.get(id);
-      if (element && (includeDeleted || !element.isDeleted)) elements.push(element);
+      if (element && (includeDeleted || (!element.isDeleted && !hidden!.has(id))))
+        elements.push(element);
     }
     if (includeDeleted) this.orderedElementsWithDeleted = elements;
     else this.orderedElements = elements;

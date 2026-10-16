@@ -1,17 +1,26 @@
 import type {
   AppStateData,
   BaseElement,
+  Binding,
   Element,
   ElementType,
   FileRecord,
   FillStyle,
+  FontFamily,
+  MindmapLink,
+  ShapeLabel,
   StrokeStyle,
 } from '../core/types';
 import { DEFAULT_APP_STATE, DEFAULT_STYLE } from '../core/types';
 import { createId, createNonce } from '../core/ids';
+/**
+ * File format version. 2 added shape labels, attached arrows and mind maps;
+ * version 1 files open unchanged because those fields are optional.
+ */
+export const FILE_VERSION = 2;
 export interface DdrawFile {
   type: 'ddraw';
-  version: 1;
+  version: typeof FILE_VERSION;
   source: 'ddraw';
   elements: Element[];
   appState: { viewBackgroundColor: string; gridEnabled: boolean };
@@ -24,7 +33,7 @@ export function serialize(
 ): string {
   return JSON.stringify({
     type: 'ddraw',
-    version: 1,
+    version: FILE_VERSION,
     source: 'ddraw',
     elements,
     appState: {
@@ -46,6 +55,33 @@ const valid = new Set<ElementType>([
 ]);
 function record(v: unknown): Record<string, unknown> | null {
   return typeof v === 'object' && v !== null ? (v as Record<string, unknown>) : null;
+}
+const font = (v: unknown): FontFamily =>
+  v === 'hand' || v === 'Virgil' ? 'hand' : v === 'mono' ? 'mono' : 'sans';
+function importLabel(v: unknown): ShapeLabel | undefined {
+  const r = record(v);
+  if (!r || typeof r.text !== 'string') return undefined;
+  return {
+    text: r.text,
+    fontSize: typeof r.fontSize === 'number' && r.fontSize > 0 ? r.fontSize : 20,
+    fontFamily: font(r.fontFamily),
+  };
+}
+function importMindmap(v: unknown): MindmapLink | undefined {
+  const r = record(v);
+  if (!r || typeof r.rootId !== 'string') return undefined;
+  return {
+    rootId: r.rootId,
+    parentId: typeof r.parentId === 'string' ? r.parentId : null,
+    side: r.side === 'left' ? 'left' : 'right',
+    order: typeof r.order === 'number' ? r.order : 0,
+    collapsed: r.collapsed === true,
+    color: typeof r.color === 'string' ? r.color : DEFAULT_STYLE.strokeColor,
+  };
+}
+function importBinding(v: unknown): Binding | null {
+  const r = record(v);
+  return r && typeof r.elementId === 'string' ? { elementId: r.elementId } : null;
 }
 function importElement(v: unknown): Element | null {
   const r = record(v);
@@ -99,6 +135,8 @@ function importElement(v: unknown): Element | null {
       startArrowhead: (r.startArrowhead ?? null) as null | 'arrow' | 'bar' | 'dot',
       endArrowhead: (r.endArrowhead ?? (type === 'arrow' ? 'arrow' : null)) as
         null | 'arrow' | 'bar' | 'dot',
+      startBinding: importBinding(r.startBinding),
+      endBinding: importBinding(r.endBinding),
     };
   if (type === 'freedraw')
     return {
@@ -113,14 +151,20 @@ function importElement(v: unknown): Element | null {
       type,
       text: str('text', ''),
       fontSize: n('fontSize', 20),
-      fontFamily: (str('fontFamily', 'sans') === 'Virgil' ? 'hand' : str('fontFamily', 'sans')) as
-        'hand' | 'sans' | 'mono',
+      fontFamily: font(r.fontFamily),
       textAlign: str('textAlign', 'left') as 'left' | 'center' | 'right',
       verticalAlign: str('verticalAlign', 'top') as 'top' | 'middle' | 'bottom',
       lineHeight: n('lineHeight', 1.25),
     };
   if (type === 'image') return { ...base, type, fileId: str('fileId', ''), status: 'loaded' };
-  return { ...base, type } as Element;
+  const label = importLabel(r.label);
+  const mindmap = importMindmap(r.mindmap);
+  return {
+    ...base,
+    type: type as 'rectangle' | 'ellipse' | 'diamond',
+    ...(label && { label }),
+    ...(mindmap && { mindmap }),
+  };
 }
 export function deserialize(json: string): {
   elements: Element[];
@@ -131,6 +175,10 @@ export function deserialize(json: string): {
   if (!root) throw new Error('Invalid drawing file');
   if (root.type !== 'ddraw' && root.type !== 'excalidraw')
     throw new Error('Unsupported drawing file');
+  if (root.type === 'ddraw' && typeof root.version === 'number' && root.version > FILE_VERSION)
+    throw new Error(
+      'This drawing was made with a newer version of Ddraw. Update Ddraw to open it.',
+    );
   const elements = (Array.isArray(root.elements) ? root.elements : [])
     .map(importElement)
     .filter((e): e is Element => e !== null);

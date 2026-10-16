@@ -14,7 +14,8 @@ export type ToolId =
   | 'eraser'
   | 'text'
   | 'image'
-  | 'hand';
+  | 'hand'
+  | 'mindmap';
 export interface Point {
   x: number;
   y: number;
@@ -42,14 +43,38 @@ export interface BaseElement {
   groupIds: string[];
   locked: boolean;
 }
+export type FontFamily = 'hand' | 'sans' | 'mono';
+/** Text written inside a shape. It is part of the shape, so it moves and syncs with it. */
+export interface ShapeLabel {
+  text: string;
+  fontSize: number;
+  fontFamily: FontFamily;
+}
+/** Links a shape into a mind map. Branch lines are drawn from these links, not stored. */
+export interface MindmapLink {
+  rootId: string;
+  parentId: string | null;
+  side: 'left' | 'right';
+  order: number;
+  collapsed: boolean;
+  color: string;
+}
 export interface ShapeElement extends BaseElement {
   type: 'rectangle' | 'ellipse' | 'diamond';
+  label?: ShapeLabel;
+  mindmap?: MindmapLink;
+}
+/** An arrow end attached to a shape; the end follows the shape when it moves. */
+export interface Binding {
+  elementId: string;
 }
 export interface LinearElement extends BaseElement {
   type: 'line' | 'arrow';
   points: [number, number][];
   startArrowhead: Arrowhead;
   endArrowhead: Arrowhead;
+  startBinding?: Binding | null;
+  endBinding?: Binding | null;
 }
 export interface FreeDrawElement extends BaseElement {
   type: 'freedraw';
@@ -60,7 +85,7 @@ export interface TextElement extends BaseElement {
   type: 'text';
   text: string;
   fontSize: number;
-  fontFamily: 'hand' | 'sans' | 'mono';
+  fontFamily: FontFamily;
   textAlign: 'left' | 'center' | 'right';
   verticalAlign: 'top' | 'middle' | 'bottom';
   lineHeight: number;
