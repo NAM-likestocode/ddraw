@@ -1,6 +1,8 @@
 import type { CameraState, Element, FileRecord, LinearElement } from '../core/types';
 import { RenderCache } from './cache';
 import { fontFamily } from './fonts';
+import { sketchFor } from './sketch';
+import type { Sketch } from './sketch';
 function transform(ctx: CanvasRenderingContext2D, e: Element, c: CameraState, dpr: number): void {
   const z = c.zoom * dpr;
   const cs = Math.cos(e.angle);
@@ -45,7 +47,28 @@ function arrowhead(
   }
   ctx.restore();
 }
-// TODO: route roughness > 0 and hachure fills through a seeded cached sketch path.
+/** Strokes and fills the sketch's cached Path2D objects. Outlines follow the dash style. */
+function drawSketch(
+  ctx: CanvasRenderingContext2D,
+  e: Element,
+  sketch: Sketch,
+  cache: RenderCache,
+): void {
+  const paths = cache.sketchPaths(sketch);
+  for (const [index, part] of sketch.paths.entries()) {
+    const path = paths[index]!;
+    if (part.fill !== 'none') {
+      ctx.fillStyle = part.fill;
+      ctx.fill(path);
+    }
+    if (part.stroke !== 'none') {
+      ctx.strokeStyle = part.stroke;
+      ctx.lineWidth = part.strokeWidth;
+      cache.setLineDash(ctx, part.dashed ? e.strokeStyle : 'solid');
+      ctx.stroke(path);
+    }
+  }
+}
 export function drawElement(
   ctx: CanvasRenderingContext2D,
   e: Element,
@@ -63,7 +86,9 @@ export function drawElement(
   ctx.lineJoin = e.roundness === 'round' ? 'round' : 'miter';
   ctx.lineCap = 'round';
   cache.setLineDash(ctx, e.strokeStyle);
-  if (e.type === 'rectangle') {
+  const sketch = sketchFor(e);
+  if (sketch) drawSketch(ctx, e, sketch, cache);
+  else if (e.type === 'rectangle') {
     ctx.beginPath();
     if (e.roundness === 'round')
       ctx.roundRect(

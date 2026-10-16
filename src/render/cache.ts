@@ -6,12 +6,14 @@ import type {
   LinearElement,
   StrokeStyle,
 } from '../core/types';
+import type { Sketch } from './sketch';
 export class RenderCache {
   private paths = new WeakMap<Element, Path2D>();
   private images = new Map<string, ImageBitmap>();
   private loading = new Map<string, Promise<ImageBitmap | undefined>>();
   private metrics = new Map<string, TextMetrics>();
   private lineDashes = new WeakMap<CanvasRenderingContext2D, StrokeStyle>();
+  private sketchCache = new WeakMap<Sketch, Path2D[]>();
   setLineDash(ctx: CanvasRenderingContext2D, style: StrokeStyle): void {
     if (this.lineDashes.get(ctx) === style) return;
     if (style !== 'solid' || this.lineDashes.has(ctx))
@@ -20,6 +22,15 @@ export class RenderCache {
   }
   resetContext(ctx: CanvasRenderingContext2D): void {
     this.lineDashes.delete(ctx);
+  }
+  /** Path2D objects for a sketch, built once from the same SVG path data the export writes. */
+  sketchPaths(sketch: Sketch): Path2D[] {
+    let paths = this.sketchCache.get(sketch);
+    if (!paths) {
+      paths = sketch.paths.map((part) => new Path2D(part.d));
+      this.sketchCache.set(sketch, paths);
+    }
+    return paths;
   }
   pathFor(el: LinearElement | FreeDrawElement): Path2D {
     const old = this.paths.get(el);

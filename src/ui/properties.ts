@@ -57,7 +57,8 @@ export function createProperties(
       store.update(ids, (item) => {
         Object.assign(item, { [key]: value });
       });
-    else
+    // Sketchy/Clean is also remembered as the default for new elements.
+    if (!ids.size || key === 'roughness')
       state.update((appState) => {
         Object.assign(appState.style, { [key]: value });
       });
@@ -93,6 +94,7 @@ export function createProperties(
     const edge = has('rectangle', 'diamond');
     const arrow = has('arrow');
     const text = has('text');
+    const sketchable = has('rectangle', 'ellipse', 'diamond', 'line', 'arrow');
     const value = (key: PropertyKey) => currentValue(key);
 
     element.innerHTML = `${swatches('Stroke', 'strokeColor')}
@@ -132,6 +134,19 @@ export function createProperties(
               ],
               value('strokeStyle'),
             )}`
+          : ''
+      }
+      ${
+        sketchable
+          ? segment(
+              'Style',
+              'roughness',
+              [
+                ['1', 'Sketchy', 'Hand-drawn lines and hatching'],
+                ['0', 'Clean', 'Straight, precise lines'],
+              ],
+              Number(value('roughness')) > 0 ? '1' : '0',
+            )
           : ''
       }
       ${
@@ -220,7 +235,10 @@ export function createProperties(
     else if (target.dataset.value !== undefined) {
       const key = target.dataset.key!;
       const raw = target.dataset.value;
-      const value = key === 'strokeWidth' || key === 'fontSize' ? Number(raw) : raw || null;
+      const value =
+        key === 'strokeWidth' || key === 'fontSize' || key === 'roughness'
+          ? Number(raw)
+          : raw || null;
       apply(key, value);
     }
     const action = target.dataset.action;

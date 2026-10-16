@@ -3,6 +3,8 @@ import { selectionBounds } from '../core/geometry';
 import type { Arrowhead, Element, FileRecord, FreeDrawElement, LinearElement } from '../core/types';
 import { RenderCache } from '../render/cache';
 import { drawElement } from '../render/shapes';
+import { sketchFor } from '../render/sketch';
+import type { Sketch } from '../render/sketch';
 import { fontFamily } from '../render/fonts';
 
 export interface ExportOptions {
@@ -83,20 +85,34 @@ function rotation(element: Element): string {
   return ` transform="rotate(${number((element.angle * 180) / Math.PI)} ${number(cx)} ${number(cy)})"`;
 }
 
-function paint(element: Element, patternId?: string): string {
+function paint(element: Element): string {
   const dash =
     element.strokeStyle === 'dashed'
       ? ' stroke-dasharray="10 8"'
       : element.strokeStyle === 'dotted'
         ? ' stroke-dasharray="2 6" stroke-linecap="round"'
         : '';
-  const fill =
-    element.fillStyle === 'none'
-      ? 'none'
-      : patternId
-        ? `url(#${patternId})`
-        : element.backgroundColor;
+  const fill = element.fillStyle === 'none' ? 'none' : element.backgroundColor;
   return `stroke="${escapeXml(element.strokeColor)}" stroke-width="${number(element.strokeWidth)}" stroke-linejoin="${element.roundness === 'round' ? 'round' : 'miter'}" fill="${escapeXml(fill)}" opacity="${number(element.opacity / 100)}"${dash}`;
+}
+
+/** Sketchy shapes: one SVG path per rough.js path, with the same data the canvas uses. */
+function sketchSvg(element: Element, sketch: Sketch): string {
+  const dash =
+    element.strokeStyle === 'dashed'
+      ? ' stroke-dasharray="10 8"'
+      : element.strokeStyle === 'dotted'
+        ? ' stroke-dasharray="2 6"'
+        : '';
+  const join = element.roundness === 'round' ? 'round' : 'miter';
+  const opacity = number(element.opacity / 100);
+  const paths = sketch.paths
+    .map(
+      (part) =>
+        `<path d="${part.d}" fill="${escapeXml(part.fill)}" stroke="${escapeXml(part.stroke)}" stroke-width="${number(part.strokeWidth)}" stroke-linecap="round" stroke-linejoin="${join}" opacity="${opacity}"${part.dashed ? dash : ''}/>`,
+    )
+    .join('');
+  return `<g${rotation(element)}>${paths}</g>`;
 }
 
 function outlineFor(element: FreeDrawElement): number[][] {
@@ -169,40 +185,31 @@ export function exportToSvg(
   const viewY = metrics.bounds.minY - metrics.padding;
   const viewWidth = metrics.width / metrics.scale;
   const viewHeight = metrics.height / metrics.scale;
-  const defs: string[] = [];
   const body: string[] = [];
   if (options.background)
     body.push(
       `<rect x="${number(viewX)}" y="${number(viewY)}" width="${number(viewWidth)}" height="${number(viewHeight)}" fill="${escapeXml(options.background)}"/>`,
     );
 
-  for (const [index, element] of elements.entries()) {
-    let patternId: string | undefined;
-    if (element.fillStyle === 'hachure' || element.fillStyle === 'cross-hatch') {
-      patternId = `hachure-${index}`;
-      const reverse =
-        element.fillStyle === 'cross-hatch'
-          ? `<path d="M 0 8 L 8 0" stroke="${escapeXml(element.strokeColor)}" stroke-width="1"/>`
-          : '';
-      defs.push(
-        `<pattern id="${patternId}" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="${escapeXml(element.backgroundColor)}"/><path d="M 0 0 L 8 8" stroke="${escapeXml(element.strokeColor)}" stroke-width="1"/>${reverse}</pattern>`,
-      );
-    }
-    if (element.type === 'rectangle') {
+  for (const element of elements) {
+    const sketch = sketchFor(element);
+    if (sketch) {
+      body.push(sketchSvg(element, sketch));
+    } else if (element.type === 'rectangle') {
       const radius =
         element.roundness === 'round'
           ? Math.min(12, Math.abs(element.width) / 4, Math.abs(element.height) / 4)
           : 0;
       body.push(
-        `<rect x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}"${radius ? ` rx="${number(radius)}"` : ''} ${paint(element, patternId)}${rotation(element)}/>`,
+        `<rect x="${number(element.x)}" y="${number(element.y)}" width="${number(element.width)}" height="${number(element.height)}"${radius ? ` rx="${number(radius)}"` : ''} ${paint(element)}${rotation(element)}/>`,
       );
     } else if (element.type === 'ellipse') {
       body.push(
-        `<ellipse cx="${number(element.x + element.width / 2)}" cy="${number(element.y + element.height / 2)}" rx="${number(Math.abs(element.width / 2))}" ry="${number(Math.abs(element.height / 2))}" ${paint(element, patternId)}${rotation(element)}/>`,
+        `<ellipse cx="${number(element.x + element.width / 2)}" cy="${number(element.y + element.height / 2)}" rx="${number(Math.abs(element.width / 2))}" ry="${number(Math.abs(element.height / 2))}" ${paint(element)}${rotation(element)}/>`,
       );
     } else if (element.type === 'diamond') {
       const points = `${number(element.x + element.width / 2)},${number(element.y)} ${number(element.x + element.width)},${number(element.y + element.height / 2)} ${number(element.x + element.width / 2)},${number(element.y + element.height)} ${number(element.x)},${number(element.y + element.height / 2)}`;
-      body.push(`<polygon points="${points}" ${paint(element, patternId)}${rotation(element)}/>`);
+      body.push(`<polygon points="${points}" ${paint(element)}${rotation(element)}/>`);
     } else if (element.type === 'line' || element.type === 'arrow') {
       body.push(linearSvg(element));
     } else if (element.type === 'freedraw') {
@@ -245,5 +252,5 @@ export function exportToSvg(
     }
   }
 
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${metrics.width}" height="${metrics.height}" viewBox="${number(viewX)} ${number(viewY)} ${number(viewWidth)} ${number(viewHeight)}">${defs.length ? `<defs>${defs.join('')}</defs>` : ''}${body.join('')}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${metrics.width}" height="${metrics.height}" viewBox="${number(viewX)} ${number(viewY)} ${number(viewWidth)} ${number(viewHeight)}">${body.join('')}</svg>`;
 }
