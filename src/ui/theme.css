@@ -98,6 +98,11 @@ button:disabled {
   padding: 5px;
   transform: translateX(-50%);
 }
+.icon {
+  display: block;
+  flex: none;
+  pointer-events: none;
+}
 .icon-btn {
   position: relative;
   display: grid;
@@ -106,8 +111,17 @@ button:disabled {
   height: 36px;
   min-height: 36px;
   padding: 0;
+  border-radius: 8px;
   place-items: center;
   color: var(--text-2);
+}
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.icon-btn:active:not(:disabled) {
+  background: var(--bg-deep);
+  transform: scale(0.94);
 }
 .icon-btn kbd {
   position: absolute;
@@ -118,11 +132,16 @@ button:disabled {
     9px/1 Inter,
     system-ui,
     sans-serif;
+  pointer-events: none;
 }
-.icon-btn.active {
+.icon-btn.active,
+.icon-btn.active:hover:not(:disabled) {
   border-color: var(--accent-dark);
   background: var(--accent);
   color: var(--on-accent);
+}
+.icon-btn.active:active:not(:disabled) {
+  background: var(--accent-dark);
 }
 .icon-btn.active kbd {
   color: #fff9;
@@ -141,23 +160,19 @@ button:disabled {
 }
 .menu-trigger {
   position: relative;
-  display: flex;
-  width: 40px;
-  height: 40px;
-  padding: 10px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
+  display: grid;
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  place-items: center;
+  color: var(--text-2);
 }
-.menu-trigger span {
-  display: block;
-  width: 18px;
-  height: 1.5px;
-  border-radius: 2px;
-  background: currentColor;
+.menu-trigger:hover:not(:disabled) {
+  color: var(--text);
 }
 .menu-panel {
-  top: 47px;
+  top: 54px;
   left: 0;
   display: flex;
   width: 244px;
@@ -172,18 +187,20 @@ button:disabled {
 .menu-panel button {
   display: grid;
   min-height: 36px;
-  padding: 7px 9px;
+  padding: 0 9px;
   grid-template-columns: 20px 1fr auto;
-  gap: 9px;
+  gap: 10px;
   align-items: center;
   border-color: transparent;
   background: transparent;
+  color: var(--text-2);
   text-align: left;
 }
-.menu-panel button svg {
-  width: 19px;
-  height: 19px;
-  color: var(--text-2);
+.menu-panel button:hover:not(:disabled) {
+  color: var(--text);
+}
+.menu-panel button:active:not(:disabled) {
+  background: var(--bg-deep);
 }
 .menu-panel button kbd {
   color: var(--text-disabled);
@@ -314,15 +331,25 @@ button:disabled {
   bottom: 12px;
   left: 12px;
   display: flex;
-  gap: 2px;
-  padding: 4px;
-}
-.zoom-bar button {
-  min-width: 32px;
-  padding: 0 8px;
+  height: 48px;
+  gap: 3px;
+  align-items: center;
+  padding: 5px;
 }
 .zoom-value {
-  width: 58px;
+  min-width: 58px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.zoom-value:hover:not(:disabled) {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 .stats {
   right: 12px;
@@ -354,6 +381,19 @@ button:disabled {
   position: absolute;
   top: 12px;
   right: 12px;
+  display: grid;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+  place-items: center;
+}
+.modal .close:hover:not(:disabled) {
+  color: var(--text);
 }
 .modal h2 {
   margin: 0 0 16px;
@@ -449,9 +489,11 @@ button:disabled {
 .share-pill {
   position: absolute;
   z-index: 8;
-  top: 14px;
-  right: 14px;
+  top: 18px;
+  right: 12px;
+  height: 36px;
   min-width: 72px;
+  min-height: 36px;
   padding: 0 12px;
   border-color: var(--accent-dark);
   box-shadow: 0 8px 24px #090b1066;

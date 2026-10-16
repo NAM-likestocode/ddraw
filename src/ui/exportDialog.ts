@@ -2,6 +2,7 @@ import type { AppState, SceneStore } from '../core/store';
 import type { Element } from '../core/types';
 import { exportToCanvas, exportToSvg, type ExportOptions } from '../io/export';
 import { getPlatform } from '../io/platform';
+import { icon } from './icons';
 
 export interface ExportDialogController {
   element: HTMLElement;
@@ -24,7 +25,7 @@ export function createExportDialog(store: SceneStore, state: AppState): ExportDi
   element.className = 'export-dialog modal';
   element.hidden = true;
   element.innerHTML = `<div class="export-card" role="dialog" aria-modal="true" aria-labelledby="export-title">
-    <button class="close" type="button" aria-label="Close">×</button>
+    <button class="close" type="button" aria-label="Close"></button>
     <h2 id="export-title">Export image</h2>
     <div class="export-preview" aria-label="Export preview"></div>
     <div class="export-options">
@@ -105,7 +106,9 @@ export function createExportDialog(store: SceneStore, state: AppState): ExportDi
     status.classList.remove('error');
   };
 
-  element.querySelector<HTMLButtonElement>('.close')!.onclick = () => (element.hidden = true);
+  const close = element.querySelector<HTMLButtonElement>('.close')!;
+  close.append(icon('close'));
+  close.onclick = () => (element.hidden = true);
   element.addEventListener('pointerdown', (event) => {
     if (event.target === element) element.hidden = true;
   });
