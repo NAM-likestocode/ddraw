@@ -1,6 +1,7 @@
 import type { AppState, SceneStore } from '../core/store';
 import type { Element, ElementType, StyleDefaults } from '../core/types';
-import { createId, createNonce } from '../core/ids';
+import { icon } from './icons';
+import { deleteSelection, duplicateSelection } from '../core/selection';
 
 const colors = [
   '#D8DEE9',
@@ -39,9 +40,11 @@ const segment = (
 export function createProperties(
   store: SceneStore,
   state: AppState,
-): { element: HTMLElement; refresh(): void } {
+): { element: HTMLElement; refresh(): void; toggleDetails(): void } {
   const element = document.createElement('aside');
   element.className = 'properties';
+  // With a selection, the full panel only opens on request; the style bar covers the basics.
+  let details = false;
 
   const selected = (): Element[] =>
     [...state.value.selectedIds]
@@ -83,9 +86,11 @@ export function createProperties(
     const types = new Set<ElementType>(
       chosen.length ? chosen.map((item) => item.type) : [activeType],
     );
+    if (!chosen.length) details = false;
     element.hidden =
-      (state.value.activeTool === 'select' && chosen.length === 0) ||
-      state.value.activeTool === 'hand';
+      (state.value.activeTool === 'select' && (chosen.length === 0 || !details)) ||
+      state.value.activeTool === 'hand' ||
+      state.value.activeTool === 'mindmap';
     if (element.hidden) return;
     const has = (...wanted: ElementType[]) => [...types].some((type) => wanted.includes(type));
     const all = (predicate: (type: ElementType) => boolean) => [...types].every(predicate);
@@ -97,7 +102,7 @@ export function createProperties(
     const sketchable = has('rectangle', 'ellipse', 'diamond', 'line', 'arrow');
     const value = (key: PropertyKey) => currentValue(key);
 
-    element.innerHTML = `${swatches('Stroke', 'strokeColor')}
+    element.innerHTML = `${chosen.length ? `<button type="button" class="panel-close" data-action="close" title="Close" aria-label="Close style panel">${icon('close', 14).outerHTML}</button>` : ''}${swatches('Stroke', 'strokeColor')}
       ${
         fill
           ? `${swatches('Background', 'backgroundColor')}${segment(
@@ -242,22 +247,11 @@ export function createProperties(
       apply(key, value);
     }
     const action = target.dataset.action;
-    if (action === 'delete') store.remove(state.value.selectedIds);
-    else if (action === 'duplicate') {
-      const made: Element[] = [];
-      for (const id of state.value.selectedIds) {
-        const source = store.get(id);
-        if (!source) continue;
-        const copy = structuredClone(source);
-        copy.id = createId();
-        copy.x += 20;
-        copy.y += 20;
-        copy.version = 1;
-        copy.versionNonce = createNonce();
-        store.add(copy);
-        made.push(copy);
-      }
-      state.update({ selectedIds: new Set(made.map((item) => item.id)) });
+    if (action === 'delete') deleteSelection(store, state);
+    else if (action === 'duplicate') duplicateSelection(store, state);
+    else if (action === 'close') {
+      details = false;
+      refresh();
     } else if (action)
       store.reorder(state.value.selectedIds, action as 'front' | 'back' | 'forward' | 'backward');
   });
@@ -274,5 +268,9 @@ export function createProperties(
   });
 
   refresh();
-  return { element, refresh };
+  const toggleDetails = () => {
+    details = !details;
+    refresh();
+  };
+  return { element, refresh, toggleDetails };
 }

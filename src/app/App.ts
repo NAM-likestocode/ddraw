@@ -20,6 +20,8 @@ import { syncBindings } from '../core/bindings';
 import { createToolbar } from '../ui/toolbar';
 import { createMenu, type MenuAction } from '../ui/menu';
 import { createProperties } from '../ui/properties';
+import { createStyleBar } from '../ui/styleBar';
+import { deleteSelection, duplicateSelection } from '../core/selection';
 import { createZoom } from '../ui/zoom';
 import { createShortcuts } from '../ui/shortcuts';
 import { createStats } from '../ui/stats';
@@ -61,6 +63,7 @@ export class App {
     this.camera = new Camera(this.appState.value.camera, () => {
       this.renderer?.markDirty();
       this.zoom?.refresh();
+      this.styleBar?.refresh();
     });
     this.renderer = new Renderer(root, this.store, this.appState, this.camera);
     for (const tool of [
@@ -93,6 +96,11 @@ export class App {
     };
     this.toolbar = createToolbar('select', (id) => this.setTool(id));
     this.properties = createProperties(this.store, this.appState);
+    this.styleBar = createStyleBar(this.store, this.appState, this.camera, {
+      more: () => this.properties.toggleDetails(),
+      duplicate: () => duplicateSelection(this.store, this.appState),
+      remove: () => deleteSelection(this.store, this.appState),
+    });
     this.zoom = createZoom(
       this.camera,
       this.store,
@@ -115,6 +123,7 @@ export class App {
       this.toolbar.element,
       this.menu.element,
       this.properties.element,
+      this.styleBar.element,
       this.zoom.element,
       this.stats.element,
       this.shortcuts.element,
@@ -134,6 +143,7 @@ export class App {
       );
       this.zoom.refresh();
       this.properties.refresh();
+      this.styleBar.refresh();
       this.stats.set(this.store.getElements().length, this.appState.value.showStats);
       if (origin === 'local') {
         this.dirty = true;
@@ -146,12 +156,14 @@ export class App {
       this.toolbar.setActive(this.appState.value.activeTool);
       this.toolbar.setLocked(this.appState.value.toolLocked);
       this.properties.refresh();
+      this.styleBar.refresh();
       this.stats.set(this.store.getElements().length, this.appState.value.showStats);
     });
     this.renderer.markDirty();
   }
   private toolbar;
   private properties;
+  private styleBar;
   private zoom;
   private shortcuts;
   private stats;

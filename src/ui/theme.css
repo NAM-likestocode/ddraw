@@ -642,3 +642,124 @@ button:disabled {
     margin-left: 0;
   }
 }
+.style-bar {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px #090b1099;
+  white-space: nowrap;
+  animation: style-bar-in 120ms ease-out;
+}
+.style-bar[hidden] {
+  display: none;
+}
+@keyframes style-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.style-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.style-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+}
+.style-bar button {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  min-height: 0;
+  padding: 0 6px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+}
+.style-bar button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.style-bar button.active {
+  background: var(--surface-btn);
+  color: var(--accent);
+}
+.style-bar button[data-action^='preset:'] {
+  min-width: 22px;
+  width: 22px;
+  height: 22px;
+  min-height: 0;
+  padding: 0;
+  border: 2px solid var(--sw);
+  border-radius: 50%;
+  background: transparent;
+}
+.style-bar button[data-fill='hachure'] {
+  background: repeating-linear-gradient(-45deg, var(--sw) 0 2px, transparent 2px 5px);
+}
+.style-bar button[data-action^='preset:'].active {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.seg-pill {
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+.seg-pill button {
+  height: 24px;
+}
+.fill-swatch {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid currentColor;
+  border-radius: 4px;
+}
+.fill-solid {
+  background: currentColor;
+}
+.fill-hachure {
+  background: repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 4px);
+}
+.fill-cross-hatch {
+  background:
+    repeating-linear-gradient(-45deg, currentColor 0 1.5px, transparent 1.5px 4px),
+    repeating-linear-gradient(45deg, currentColor 0 1.5px, transparent 1.5px 4px);
+}
+.width-line {
+  width: 16px;
+  height: var(--w);
+  border-radius: 2px;
+  background: currentColor;
+}
+.panel-close {
+  float: right;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  margin: -4px -4px 0 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-disabled);
+  cursor: pointer;
+}
+.panel-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}

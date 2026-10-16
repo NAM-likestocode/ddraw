@@ -19,7 +19,6 @@ import {
   descendantsOf,
   isNode,
   neighbour,
-  removeBranches,
   reparent,
   toggleCollapsed,
   type MindmapNode,
@@ -27,7 +26,7 @@ import {
 import { addChildNode, addSiblingNode, renameNode } from './mindmap';
 import { dot, highlight, signButton, worldTransform } from './overlay';
 import { snapBounds, type Guide } from './snapping';
-import { duplicateElements } from '../core/duplicate';
+import { deleteSelection, duplicateSelection, withBranches } from '../core/selection';
 const CLIP = 'ddraw-elements:';
 type Mode = 'none' | 'drag' | 'marquee' | 'resize' | 'rotate' | 'endpoint' | 'connect';
 type Direction = 'right' | 'down' | 'left' | 'up';
@@ -152,26 +151,8 @@ export const selectTool = (): Tool => {
     }
     return null;
   };
-  const duplicate = (ctx: ToolContext) => {
-    const source = [...dragSet(ctx)]
-      .map((id) => ctx.store.get(id))
-      .filter((e): e is Element => Boolean(e && !e.isDeleted));
-    const made = duplicateElements(source);
-    ctx.store.beginHistoryGroup();
-    for (const copy of made) ctx.store.add(copy);
-    ctx.store.endHistoryGroup();
-    const picked = new Set(ctx.appState.value.selectedIds);
-    ctx.appState.update({
-      selectedIds: new Set(made.filter((_, i) => picked.has(source[i]!.id)).map((e) => e.id)),
-    });
-  };
   /** The selection plus the branches below any selected mind-map nodes. */
-  const dragSet = (ctx: ToolContext): Set<string> => {
-    const ids = new Set(ctx.appState.value.selectedIds);
-    for (const id of [...ids])
-      if (isNode(ctx.store.get(id))) for (const d of descendantsOf(ctx.store, id)) ids.add(d);
-    return ids;
-  };
+  const dragSet = (ctx: ToolContext) => withBranches(ctx.store, ctx.appState.value.selectedIds);
   /** Arrows dragged on their own let go of shapes that are staying behind. */
   const releaseBindings = (ids: Set<string>, ctx: ToolContext) => {
     const loose = [...ids].filter((id) => {
@@ -554,12 +535,7 @@ export const selectTool = (): Tool => {
       const ids = ctx.appState.value.selectedIds;
       const one = single(ctx);
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const nodes = [...ids].filter((id) => isNode(ctx.store.get(id)));
-        ctx.store.beginHistoryGroup();
-        const next = nodes.length ? removeBranches(ctx.store, nodes) : null;
-        ctx.store.remove(ids);
-        ctx.store.endHistoryGroup();
-        ctx.appState.update({ selectedIds: new Set(next ? [next] : []) });
+        deleteSelection(ctx.store, ctx.appState);
       } else if (e.key === 'Tab' && isNode(one)) {
         e.preventDefault();
         addChildNode(ctx, one.id);
@@ -591,7 +567,7 @@ export const selectTool = (): Tool => {
         ctx.appState.update({ selectedIds: new Set(ctx.store.getElements().map((x) => x.id)) });
       } else if (mod && e.key.toLowerCase() === 'd') {
         e.preventDefault();
-        duplicate(ctx);
+        duplicateSelection(ctx.store, ctx.appState);
       } else if (mod && e.key.toLowerCase() === 'c') {
         const elements = selected(ctx);
         void navigator.clipboard?.writeText(CLIP + JSON.stringify(elements));

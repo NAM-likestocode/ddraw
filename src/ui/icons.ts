@@ -1,5 +1,6 @@
 import {
   BoxSelect,
+  Copy,
   Circle,
   createElement,
   Diamond,
@@ -25,6 +26,7 @@ import {
   Scan,
   Share2,
   Slash,
+  SlidersHorizontal,
   Square,
   Trash2,
   Type,
@@ -64,6 +66,8 @@ const ICONS = {
   share: Share2,
   shortcuts: Keyboard,
   close: X,
+  duplicate: Copy,
+  more: SlidersHorizontal,
 };
 
 export type IconName = keyof typeof ICONS;
