@@ -20,6 +20,7 @@
     "@tauri-apps/plugin-fs": "^2.5.2",
     "nanoid": "^5.1.6",
     "perfect-freehand": "^1.2.3",
+    "roughjs": "^4.6.6",
     "y-protocols": "^1.0.7",
     "y-websocket": "^3.1.0",
     "yjs": "^13.6.32"

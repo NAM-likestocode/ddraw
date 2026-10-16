@@ -120,7 +120,7 @@ export const DEFAULT_STYLE: StyleDefaults = {
   fillStyle: 'none',
   strokeWidth: 2,
   strokeStyle: 'solid',
-  roughness: 0,
+  roughness: 1,
   opacity: 100,
   roundness: 'round',
   startArrowhead: null,
