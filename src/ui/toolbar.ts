@@ -1,34 +1,42 @@
 import type { ToolId } from '../core/types';
+import { icon, type IconName } from './icons';
 
-type ToolDefinition = [ToolId, string, string];
-const tools: ToolDefinition[] = [
-  ['select', 'V', '<path d="M5 3l10 9-5 .8-2.7 4.7z"/>'],
+interface ToolDefinition {
+  id: ToolId;
+  key: string;
+  label: string;
+  icon: IconName;
+}
+
+// Each inner array is one group; a divider separates the groups.
+const groups: ToolDefinition[][] = [
   [
-    'hand',
-    'H',
-    '<path d="M7.5 10V5.5a1.5 1.5 0 013 0V9m0-4.5a1.5 1.5 0 013 0V9m0-3.5a1.5 1.5 0 013 0V10m0-2.5a1.5 1.5 0 013 0v4c0 4-2.6 6.5-6.5 6.5H11c-2.2 0-3.5-1-4.7-2.6L3.5 12a1.5 1.5 0 012.3-1.9L7.5 12z"/>',
+    { id: 'hand', key: 'H', label: 'Hand', icon: 'hand' },
+    { id: 'select', key: 'V', label: 'Select', icon: 'select' },
   ],
-  ['rectangle', 'R', '<rect x="3" y="4" width="14" height="12" rx="1"/>'],
-  ['diamond', 'D', '<path d="M10 2.5L18 10l-8 7.5L2 10z"/>'],
-  ['ellipse', 'O', '<ellipse cx="10" cy="10" rx="8" ry="6.5"/>'],
-  ['arrow', 'A', '<path d="M2.5 10h14m-5-5l5 5-5 5"/>'],
-  ['line', 'L', '<path d="M3 16L17 4"/>'],
-  ['freedraw', 'P', '<path d="M3 15c3-7 4 3 7-4s3 5 7-5"/>'],
   [
-    'eraser',
-    'E',
-    '<path d="M4 14l6.8-8.5a2 2 0 013.1-.1l2.7 2.7a2 2 0 01-.1 3.1L9.7 18H5.5a2 2 0 01-1.5-4zM8 16l-3-3"/>',
+    { id: 'rectangle', key: 'R', label: 'Rectangle', icon: 'rectangle' },
+    { id: 'diamond', key: 'D', label: 'Diamond', icon: 'diamond' },
+    { id: 'ellipse', key: 'O', label: 'Ellipse', icon: 'ellipse' },
   ],
-  ['text', 'T', '<path d="M4 4h12M10 4v13M7 17h6"/>'],
   [
-    'image',
-    'I',
-    '<rect x="2.5" y="3" width="15" height="14" rx="1.5"/><circle cx="7" cy="7.5" r="1.5"/><path d="M4.5 15l4-4 2.5 2 2-2 2.5 4"/>',
+    { id: 'arrow', key: 'A', label: 'Arrow', icon: 'arrow' },
+    { id: 'line', key: 'L', label: 'Line', icon: 'line' },
+  ],
+  [
+    { id: 'freedraw', key: 'P', label: 'Pen', icon: 'freedraw' },
+    { id: 'eraser', key: 'E', label: 'Eraser', icon: 'eraser' },
+    { id: 'text', key: 'T', label: 'Text', icon: 'text' },
+    { id: 'image', key: 'I', label: 'Image', icon: 'image' },
   ],
 ];
 
-const icon = (content: string): string =>
-  `<svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${content}</svg>`;
+const divider = (): HTMLSpanElement => {
+  const item = document.createElement('span');
+  item.className = 'toolbar-divider';
+  item.setAttribute('aria-hidden', 'true');
+  return item;
+};
 
 export function createToolbar(
   active: ToolId,
@@ -42,39 +50,48 @@ export function createToolbar(
   el.className = 'toolbar';
   el.setAttribute('aria-label', 'Drawing tools');
 
+  groups.forEach((group, index) => {
+    if (index > 0) el.append(divider());
+    for (const tool of group) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.tool = tool.id;
+      button.className = 'icon-btn';
+      button.title = `${tool.label} — ${tool.key}`;
+      button.setAttribute('aria-label', `${tool.label} (${tool.key})`);
+      const hint = document.createElement('kbd');
+      hint.textContent = tool.key;
+      button.append(icon(tool.icon), hint);
+      button.onclick = () => onTool(tool.id);
+      el.append(button);
+    }
+  });
+
+  el.append(divider());
   const lock = document.createElement('button');
   lock.type = 'button';
   lock.className = 'icon-btn lock';
   lock.title = 'Keep selected tool — Q';
   lock.setAttribute('aria-label', 'Keep selected tool');
-  lock.innerHTML = `${icon('<path d="M6 9V6a4 4 0 018 0v3M4 9h12v9H4z"/>')}<kbd>Q</kbd>`;
+  const lockHint = document.createElement('kbd');
+  lockHint.textContent = 'Q';
+  let lockIcon = icon('unlock');
+  lock.append(lockIcon, lockHint);
   el.append(lock);
 
-  for (const [id, key, iconPath] of tools) {
-    if (id === 'rectangle' || id === 'image') {
-      const divider = document.createElement('span');
-      divider.className = 'toolbar-divider';
-      divider.setAttribute('aria-hidden', 'true');
-      el.append(divider);
-    }
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.tool = id;
-    button.className = 'icon-btn';
-    const label = id[0]!.toUpperCase() + id.slice(1);
-    button.title = `${label} — ${key}`;
-    button.setAttribute('aria-label', `${label} (${key})`);
-    button.innerHTML = `${icon(iconPath)}<kbd>${key}</kbd>`;
-    button.onclick = () => onTool(id);
-    el.append(button);
-  }
   const setActive = (id: ToolId) => {
     for (const button of el.querySelectorAll<HTMLButtonElement>('[data-tool]'))
       button.classList.toggle('active', button.dataset.tool === id);
   };
-  const setLocked = (locked: boolean) => {
-    lock.classList.toggle('active', locked);
-    lock.setAttribute('aria-pressed', String(locked));
+  let locked = false;
+  const setLocked = (next: boolean) => {
+    lock.classList.toggle('active', next);
+    lock.setAttribute('aria-pressed', String(next));
+    if (next === locked) return;
+    locked = next;
+    const glyph = icon(next ? 'lock' : 'unlock');
+    lockIcon.replaceWith(glyph);
+    lockIcon = glyph;
   };
   setActive(active);
   setLocked(false);

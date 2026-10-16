@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import type { CollabSession } from '../collab/collab';
+import { icon } from './icons';
 
 const NAME_KEY = 'ddraw.collab.name';
 const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
@@ -43,7 +44,7 @@ export function createShareDialog(
   element.className = 'share-dialog modal';
   element.hidden = true;
   element.innerHTML = `<div class="share-card" role="dialog" aria-modal="true" aria-labelledby="share-title">
-    <button class="close" type="button" aria-label="Close">×</button>
+    <button class="close" type="button" aria-label="Close"></button>
     <h2 id="share-title">Live collaboration</h2>
     <div class="share-idle">
       <label>Your name<input data-share="name" autocomplete="name" maxlength="40" placeholder="Your name"></label>
@@ -124,7 +125,9 @@ export function createShareDialog(
     );
   };
 
-  element.querySelector<HTMLButtonElement>('.close')!.onclick = () => (element.hidden = true);
+  const close = element.querySelector<HTMLButtonElement>('.close')!;
+  close.append(icon('close'));
+  close.onclick = () => (element.hidden = true);
   element.addEventListener('pointerdown', (event) => {
     if (event.target === element) element.hidden = true;
   });
