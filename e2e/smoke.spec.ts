@@ -136,6 +136,8 @@ test('drawing app smoke test', async ({ page }) => {
     await page.keyboard.press('v');
     const rectangle = await canvasPoint(page, 340, 240);
     await page.mouse.click(rectangle.x, rectangle.y);
+    await expect(page.locator('.style-bar')).toBeVisible();
+    await page.locator('.style-bar [data-action="more"]').click();
     await expect(page.locator('.properties')).toBeVisible();
     await page.screenshot({ path: 'e2e/artifacts/ui.png' });
 
