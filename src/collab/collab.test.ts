@@ -107,6 +107,42 @@ describe('CollabBridge', () => {
     expect(p.storeB.get('same')?.x).toBe(expected.x);
   });
 
+  it('propagates undo and redo of an edit to peers', async () => {
+    const p = pair();
+    p.storeA.add(rectangle('one'));
+    await settle();
+    p.storeA.update(['one'], (element) => {
+      element.x = 50;
+    });
+    await settle();
+    expect(p.storeB.get('one')?.x).toBe(50);
+
+    p.storeA.undo();
+    await settle();
+    expect(p.storeA.get('one')?.x).toBe(0);
+    expect(p.storeB.get('one')?.x).toBe(0);
+
+    p.storeA.redo();
+    await settle();
+    expect(p.storeA.get('one')?.x).toBe(50);
+    expect(p.storeB.get('one')?.x).toBe(50);
+  });
+
+  it('undo leaves elements added by other peers alone', async () => {
+    const p = pair();
+    p.storeA.add(rectangle('mine'));
+    await settle();
+    p.storeB.add(rectangle('theirs', 200));
+    await settle();
+
+    p.storeA.undo();
+    await settle();
+    expect(p.storeA.get('mine')?.isDeleted).toBe(true);
+    expect(p.storeB.get('mine')?.isDeleted).toBe(true);
+    expect(p.storeA.get('theirs')?.isDeleted).toBe(false);
+    expect(p.storeB.get('theirs')?.isDeleted).toBe(false);
+  });
+
   it('propagates replaceScene as deletion of old IDs plus new elements', async () => {
     const p = pair();
     p.storeA.add(rectangle('old'));

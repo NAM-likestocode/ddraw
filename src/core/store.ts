@@ -3,10 +3,21 @@ import { createNonce } from './ids';
 export type ChangeOrigin = 'local' | 'remote' | 'history';
 type StoreListener = (changedIds: Set<string>, origin: ChangeOrigin) => void;
 type StateListener = (state: Readonly<AppStateData>) => void;
-interface Snapshot {
-  elements: Map<string, Element>;
-  order: string[];
-  files: Record<string, FileRecord>;
+/**
+ * One undo step: the touched elements before and after the change. Undo/redo
+ * re-apply these states as new versions, so collaborators accept them and
+ * elements that other people changed in the meantime are left alone.
+ */
+interface HistoryEntry {
+  before: Map<string, Element | undefined>;
+  after: Map<string, Element | undefined>;
+  orderBefore: string[];
+  orderAfter: string[];
+}
+interface OpenEntry {
+  before: Map<string, Element | undefined>;
+  orderBefore: string[];
+  grouped: boolean;
 }
 export class AppState {
   private listeners = new Set<StateListener>();
@@ -27,9 +38,9 @@ export class SceneStore {
   private listeners = new Set<StoreListener>();
   private orderedElements: Element[] | null = null;
   private orderedElementsWithDeleted: Element[] | null = null;
-  private undoStack: Snapshot[] = [];
-  private redoStack: Snapshot[] = [];
-  private groupBefore: Snapshot | null = null;
+  private undoStack: HistoryEntry[] = [];
+  private redoStack: HistoryEntry[] = [];
+  private open: OpenEntry | null = null;
   files: Record<string, FileRecord> = {};
   on(event: 'change', listener: StoreListener): () => void {
     void event;
@@ -41,24 +52,47 @@ export class SceneStore {
     this.orderedElementsWithDeleted = null;
     for (const listener of this.listeners) listener(ids, origin);
   }
-  private snapshot(): Snapshot {
-    return { elements: new Map(this.elements), order: [...this.order], files: { ...this.files } };
+  /** Records the pre-change state of `ids`; returns true if this call opened the entry. */
+  private track(ids: Iterable<string>): boolean {
+    const opened = !this.open;
+    if (!this.open) this.open = { before: new Map(), orderBefore: [...this.order], grouped: false };
+    for (const id of ids)
+      if (!this.open.before.has(id)) this.open.before.set(id, this.elements.get(id));
+    return opened;
   }
-  private remember(before: Snapshot): void {
-    if (this.groupBefore) return;
-    this.undoStack.push(before);
+  private commit(): void {
+    const open = this.open;
+    this.open = null;
+    if (!open) return;
+    const after = new Map<string, Element | undefined>();
+    let changed = open.orderBefore.join() !== this.order.join();
+    for (const [id, previous] of open.before) {
+      const current = this.elements.get(id);
+      after.set(id, current);
+      if (current !== previous) changed = true;
+    }
+    if (!changed) return;
+    this.undoStack.push({
+      before: open.before,
+      after,
+      orderBefore: open.orderBefore,
+      orderAfter: [...this.order],
+    });
     if (this.undoStack.length > 100) this.undoStack.shift();
     this.redoStack = [];
+  }
+  /** Runs a local change, recording it as its own undo step unless a group is open. */
+  private record(ids: Iterable<string>, change: () => void): void {
+    const opened = this.track(ids);
+    change();
+    if (opened) this.commit();
   }
   beginHistoryGroup(): void {
-    if (!this.groupBefore) this.groupBefore = this.snapshot();
+    if (this.open) this.open.grouped = true;
+    else this.open = { before: new Map(), orderBefore: [...this.order], grouped: true };
   }
   endHistoryGroup(): void {
-    if (!this.groupBefore) return;
-    this.undoStack.push(this.groupBefore);
-    if (this.undoStack.length > 100) this.undoStack.shift();
-    this.groupBefore = null;
-    this.redoStack = [];
+    if (this.open?.grouped) this.commit();
   }
   get(id: string): Element | undefined {
     return this.elements.get(id);
@@ -79,10 +113,12 @@ export class SceneStore {
     return this.getElements(true);
   }
   add(element: Element, origin: ChangeOrigin = 'local'): void {
-    const before = origin === 'local' && !this.groupBefore ? this.snapshot() : null;
-    this.elements.set(element.id, element);
-    if (!this.order.includes(element.id)) this.order.push(element.id);
-    if (before) this.remember(before);
+    const apply = () => {
+      this.elements.set(element.id, element);
+      if (!this.order.includes(element.id)) this.order.push(element.id);
+    };
+    if (origin === 'local') this.record([element.id], apply);
+    else apply();
     this.emit(new Set([element.id]), origin);
   }
   update(
@@ -90,23 +126,22 @@ export class SceneStore {
     mutator: (element: Element) => Element | void,
     origin: ChangeOrigin = 'local',
   ): void {
-    const list = [...ids];
-    const before = origin === 'local' && !this.groupBefore ? this.snapshot() : null;
-    const changed = new Set<string>();
-    for (const id of list) {
-      const old = this.elements.get(id);
-      if (!old) continue;
-      const draft = structuredClone(old) as Element;
-      const result = mutator(draft);
-      const next = (result ?? draft) as Element;
-      next.version = old.version + 1;
-      next.versionNonce = createNonce();
-      this.elements.set(id, next);
-      changed.add(id);
-    }
-    if (!changed.size) return;
-    if (before) this.remember(before);
-    this.emit(changed, origin);
+    const list = [...ids].filter((id) => this.elements.has(id));
+    if (!list.length) return;
+    const apply = () => {
+      for (const id of list) {
+        const old = this.elements.get(id)!;
+        const draft = structuredClone(old) as Element;
+        const result = mutator(draft);
+        const next = (result ?? draft) as Element;
+        next.version = old.version + 1;
+        next.versionNonce = createNonce();
+        this.elements.set(id, next);
+      }
+    };
+    if (origin === 'local') this.record(list, apply);
+    else apply();
+    this.emit(new Set(list), origin);
   }
   remove(ids: Iterable<string>): void {
     this.update(ids, (e) => {
@@ -114,8 +149,14 @@ export class SceneStore {
     });
   }
   reorder(ids: Iterable<string>, action: 'forward' | 'backward' | 'front' | 'back'): void {
-    const before = this.groupBefore ? null : this.snapshot();
     const selected = new Set(ids);
+    this.record([], () => this.applyReorder(selected, action));
+    this.emit(new Set(selected), 'local');
+  }
+  private applyReorder(
+    selected: Set<string>,
+    action: 'forward' | 'backward' | 'front' | 'back',
+  ): void {
     if (action === 'front')
       this.order = [
         ...this.order.filter((id) => !selected.has(id)),
@@ -135,20 +176,20 @@ export class SceneStore {
         if (selected.has(this.order[i]!) && !selected.has(this.order[i - 1]!))
           [this.order[i], this.order[i - 1]] = [this.order[i - 1]!, this.order[i]!];
     }
-    if (before) this.remember(before);
-    this.emit(new Set(selected), 'local');
   }
   replaceScene(
     elements: Element[],
     files: Record<string, FileRecord> = {},
     origin: ChangeOrigin = 'local',
   ): void {
-    const before = origin === 'local' && !this.groupBefore ? this.snapshot() : null;
     const changed = new Set([...this.order, ...elements.map((element) => element.id)]);
-    this.elements = new Map(elements.map((e) => [e.id, e]));
-    this.order = elements.map((e) => e.id);
-    this.files = { ...files };
-    if (before) this.remember(before);
+    const apply = () => {
+      this.elements = new Map(elements.map((e) => [e.id, e]));
+      this.order = elements.map((e) => e.id);
+      this.files = { ...files };
+    };
+    if (origin === 'local') this.record(changed, apply);
+    else apply();
     this.emit(changed, origin);
   }
   applyRemote(incoming: Element[]): void {
@@ -168,17 +209,18 @@ export class SceneStore {
     if (changed.size) this.emit(changed, 'remote');
   }
   undo(): boolean {
-    const snap = this.undoStack.pop();
-    if (!snap) return false;
-    this.redoStack.push(this.snapshot());
-    this.restore(snap);
+    if (this.open) this.commit();
+    const entry = this.undoStack.pop();
+    if (!entry) return false;
+    this.redoStack.push(entry);
+    this.restore(entry.before, entry.orderBefore);
     return true;
   }
   redo(): boolean {
-    const snap = this.redoStack.pop();
-    if (!snap) return false;
-    this.undoStack.push(this.snapshot());
-    this.restore(snap);
+    const entry = this.redoStack.pop();
+    if (!entry) return false;
+    this.undoStack.push(entry);
+    this.restore(entry.after, entry.orderAfter);
     return true;
   }
   canUndo(): boolean {
@@ -190,13 +232,40 @@ export class SceneStore {
   clearHistory(): void {
     this.undoStack = [];
     this.redoStack = [];
-    this.groupBefore = null;
+    this.open = null;
   }
-  private restore(s: Snapshot): void {
-    const changed = new Set([...this.order, ...s.order]);
-    this.elements = new Map(s.elements);
-    this.order = [...s.order];
-    this.files = { ...s.files };
+  /**
+   * Re-applies recorded states as new versions. An element that did not exist
+   * in the target state is soft-deleted rather than dropped, so peers see it go.
+   */
+  private restore(states: Map<string, Element | undefined>, order: string[]): void {
+    const changed = new Set<string>();
+    for (const [id, target] of states) {
+      const current = this.elements.get(id);
+      if (!target) {
+        if (!current || current.isDeleted) continue;
+        this.elements.set(id, {
+          ...current,
+          isDeleted: true,
+          version: current.version + 1,
+          versionNonce: createNonce(),
+        });
+      } else {
+        this.elements.set(id, {
+          ...structuredClone(target),
+          version: Math.max(current?.version ?? 0, target.version) + 1,
+          versionNonce: createNonce(),
+        });
+      }
+      changed.add(id);
+    }
+    // Keep the recorded stacking order, plus anything added since (e.g. by peers).
+    const known = new Set(order);
+    const next = order.filter((id) => this.elements.has(id));
+    for (const id of this.order) if (!known.has(id)) next.push(id);
+    for (const id of changed) if (!next.includes(id)) next.push(id);
+    if (next.join() !== this.order.join()) for (const id of next) changed.add(id);
+    this.order = next;
     this.emit(changed, 'history');
   }
 }
