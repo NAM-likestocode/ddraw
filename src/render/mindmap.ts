@@ -1,4 +1,5 @@
 import type { Element } from '../core/types';
+import type { SceneStore } from '../core/store';
 import { branchCurve, collapseButton, isNode, type MindmapNode } from '../core/mindmap';
 
 /**
@@ -8,16 +9,17 @@ import { branchCurve, collapseButton, isNode, type MindmapNode } from '../core/m
 export function drawMindmaps(
   ctx: CanvasRenderingContext2D,
   visible: readonly Element[],
-  all: ReadonlyMap<string, Element>,
+  store: SceneStore,
 ): void {
   const nodes = visible.filter(isNode);
   if (!nodes.length) return;
+  const all = store.getElements(true);
   ctx.save();
   ctx.lineCap = 'round';
   for (const node of nodes) {
     const parentId = node.mindmap.parentId;
     if (!parentId) continue;
-    const parent = all.get(parentId);
+    const parent = store.get(parentId);
     if (!isNode(parent) || parent.isDeleted) continue;
     const [a, b, c, d] = branchCurve(parent, node);
     ctx.strokeStyle = node.mindmap.color || node.strokeColor;
@@ -37,9 +39,9 @@ export function drawMindmaps(
   ctx.restore();
 }
 
-function hiddenCount(node: MindmapNode, all: ReadonlyMap<string, Element>): number {
+function hiddenCount(node: MindmapNode, all: readonly Element[]): number {
   const children = new Map<string, string[]>();
-  for (const el of all.values())
+  for (const el of all)
     if (isNode(el) && el.mindmap.rootId === node.mindmap.rootId && el.mindmap.parentId) {
       const list = children.get(el.mindmap.parentId) ?? [];
       list.push(el.id);

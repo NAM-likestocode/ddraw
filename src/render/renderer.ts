@@ -5,6 +5,8 @@ import type { Camera } from '../core/camera';
 import { boundsIntersect, elementBounds, selectionBounds } from '../core/geometry';
 import { RenderCache } from './cache';
 import { drawElement } from './shapes';
+import { drawLabel } from './label';
+import { drawMindmaps } from './mindmap';
 export type DirtyLayer = 'static' | 'interactive' | 'both';
 export class Renderer {
   readonly staticCanvas = document.createElement('canvas');
@@ -114,7 +116,11 @@ export class Renderer {
     const viewport = this.viewport();
     const selected = this.appState.value.selectedIds;
     const drawingId = this.appState.value.drawingId;
-    for (const e of this.store.getElements()) {
+    const visible = this.store.getElements();
+    this.worldTransform(ctx);
+    drawMindmaps(ctx, visible, this.store);
+    this.cache.resetContext(ctx);
+    for (const e of visible) {
       if (selected.has(e.id) || e.id === drawingId || !boundsIntersect(elementBounds(e), viewport))
         continue;
       drawElement(
@@ -126,14 +132,28 @@ export class Renderer {
         this.store.files[e.type === 'image' ? e.fileId : ''],
         () => this.markDirty('static'),
       );
+      this.drawText(ctx, e);
     }
+  }
+  private worldTransform(ctx: CanvasRenderingContext2D): void {
+    const c = this.camera.state;
+    const d = this.dpr;
+    ctx.setTransform(c.zoom * d, 0, 0, c.zoom * d, c.x * d, c.y * d);
+  }
+  /** Draws the text inside a shape, unless it is open in the editor. */
+  private drawText(ctx: CanvasRenderingContext2D, e: Element): void {
+    if (e.type !== 'rectangle' && e.type !== 'ellipse' && e.type !== 'diamond') return;
+    if (!e.label?.text || e.id === this.appState.value.editingId) return;
+    this.worldTransform(ctx);
+    drawLabel(ctx, e);
+    this.cache.resetContext(ctx);
   }
   private drawInteractive(): void {
     const ctx = this.interactiveCtx;
     this.clear(ctx);
     const viewport = this.viewport();
     const drawingId = this.appState.value.drawingId;
-    const draw = (e: Element) =>
+    const draw = (e: Element) => {
       drawElement(
         ctx,
         e,
@@ -143,6 +163,8 @@ export class Renderer {
         this.store.files[e.type === 'image' ? e.fileId : ''],
         () => this.markDirty('interactive'),
       );
+      this.drawText(ctx, e);
+    };
     const selectedEls = [];
     for (const id of this.appState.value.selectedIds) {
       if (id === drawingId) continue;
