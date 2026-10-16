@@ -22,6 +22,7 @@ const groups: ToolDefinition[][] = [
   [
     { id: 'arrow', key: 'A', label: 'Arrow', icon: 'arrow' },
     { id: 'line', key: 'L', label: 'Line', icon: 'line' },
+    { id: 'mindmap', key: 'M', label: 'Mind map', icon: 'mindmap' },
   ],
   [
     { id: 'freedraw', key: 'P', label: 'Pen', icon: 'freedraw' },

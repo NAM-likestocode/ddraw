@@ -15,6 +15,8 @@ import { freedrawTool } from '../tools/freedraw';
 import { eraserTool } from '../tools/eraser';
 import { textTool } from '../tools/text';
 import { imageTool } from '../tools/image';
+import { mindmapTool } from '../tools/mindmap';
+import { syncBindings } from '../core/bindings';
 import { createToolbar } from '../ui/toolbar';
 import { createMenu, type MenuAction } from '../ui/menu';
 import { createProperties } from '../ui/properties';
@@ -73,10 +75,12 @@ export class App {
       eraserTool(),
       textTool(),
       imageTool(),
+      mindmapTool(),
     ]) {
       this.tools.set(tool.id, tool);
     }
     this.active = this.tools.get('select')!;
+    this.store.setDeriver((ids) => syncBindings(this.store, ids));
     this.context = {
       store: this.store,
       appState: this.appState,
@@ -395,6 +399,7 @@ export class App {
       '8': 'text',
       i: 'image',
       '9': 'image',
+      m: 'mindmap',
     };
     const tool = mapping[key];
     if (tool && !mod) {
