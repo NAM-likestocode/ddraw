@@ -80,8 +80,10 @@ jobs:
       - name: Publish release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Artifacts keep their bundle subfolders (nsis/, deb/, ...), so collect the files.
         run: |
-          gh release create "$GITHUB_REF_NAME" out/* \
+          mapfile -t files < <(find out -type f)
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "Ddraw $GITHUB_REF_NAME" \
             --generate-notes
