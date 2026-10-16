@@ -115,7 +115,7 @@ export class Renderer {
     this.drawGrid(ctx);
     const viewport = this.viewport();
     const selected = this.appState.value.selectedIds;
-    const drawingId = this.appState.value.drawingId;
+    const { drawingId, editingId } = this.appState.value;
     const visible = this.store.getElements();
     this.worldTransform(ctx);
     drawMindmaps(
@@ -126,7 +126,12 @@ export class Renderer {
     );
     this.cache.resetContext(ctx);
     for (const e of visible) {
-      if (selected.has(e.id) || e.id === drawingId || !boundsIntersect(elementBounds(e), viewport))
+      if (
+        selected.has(e.id) ||
+        e.id === drawingId ||
+        (e.type === 'text' && e.id === editingId) ||
+        !boundsIntersect(elementBounds(e), viewport)
+      )
         continue;
       drawElement(
         ctx,
@@ -159,6 +164,8 @@ export class Renderer {
     const viewport = this.viewport();
     const drawingId = this.appState.value.drawingId;
     const draw = (e: Element) => {
+      // Text open in the editor is shown by the editor itself.
+      if (e.type === 'text' && e.id === this.appState.value.editingId) return;
       drawElement(
         ctx,
         e,
@@ -183,7 +190,13 @@ export class Renderer {
       const e = this.store.get(drawingId);
       if (e && !e.isDeleted && boundsIntersect(elementBounds(e), viewport)) draw(e);
     }
-    const b = selectionBounds(selectedEls);
+    // A lone line or arrow shows just its two end dots (drawn by the select tool).
+    const lone =
+      selectedEls.length === 1 &&
+      (selectedEls[0]!.type === 'line' || selectedEls[0]!.type === 'arrow');
+    // No handles while text is being typed, so they don't cover it.
+    const editing = this.appState.value.editingId !== null;
+    const b = lone || editing ? null : selectionBounds(selectedEls);
     if (b) {
       const c = this.camera.state;
       const d = this.dpr;

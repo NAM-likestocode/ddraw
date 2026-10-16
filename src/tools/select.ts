@@ -1,4 +1,4 @@
-import type { Element, LinearElement, Point, ShapeElement } from '../core/types';
+import type { Element, LinearElement, Point, ShapeElement, TextElement } from '../core/types';
 import type { Tool, ToolContext } from './types';
 import { base, world } from './helpers';
 import {
@@ -11,6 +11,8 @@ import {
 import { createId, createNonce } from '../core/ids';
 import { editTextAt } from './text';
 import { editLabel } from './labelEditor';
+import { editConnected } from './kindSwitch';
+import { textSize } from '../core/text';
 import { bindTargetAt, centerOf } from '../core/bindings';
 import {
   applyLayout,
@@ -43,6 +45,9 @@ const isShape = (el: Element | undefined | null): el is ShapeElement =>
   el?.type === 'rectangle' || el?.type === 'ellipse' || el?.type === 'diamond';
 const isLinear = (el: Element | undefined | null): el is LinearElement =>
   el?.type === 'line' || el?.type === 'arrow';
+/** Boxes and text get "+" buttons for adding a connected item. */
+const isConnectable = (el: Element | undefined | null): el is ShapeElement | TextElement =>
+  isShape(el) || el?.type === 'text';
 export const selectTool = (): Tool => {
   let mode: Mode = 'none';
   let start = { x: 0, y: 0 };
@@ -85,7 +90,7 @@ export const selectTool = (): Tool => {
     }
     return null;
   };
-  /** Points where the quick-connect buttons sit around a shape. */
+  /** Points where the quick-connect buttons sit around a box or text. */
   const connectPoints = (el: Element, ctx: ToolContext): Point[] => {
     const b = elementBounds(el);
     const off = 34 / zoom(ctx);
@@ -104,7 +109,8 @@ export const selectTool = (): Tool => {
   };
   const showConnect = (ctx: ToolContext): Element | null => {
     const el = single(ctx);
-    return el && isShape(el) && !el.locked && mode === 'none' ? el : null;
+    const editing = ctx.appState.value.editingId !== null;
+    return el && isConnectable(el) && !el.locked && mode === 'none' && !editing ? el : null;
   };
   const handleAt = (x: number, y: number, ctx: ToolContext): number => {
     const z = zoom(ctx);
@@ -116,6 +122,8 @@ export const selectTool = (): Tool => {
       if (near({ x: one.x + last[0], y: one.y + last[1] })) return END;
       if (near({ x: one.x + first[0], y: one.y + first[1] })) return START;
     }
+    // A lone line or arrow is edited by its two ends only.
+    if (isLinear(one)) return -1;
     const connector = showConnect(ctx);
     if (connector) {
       const points = connectPoints(connector, ctx);
@@ -330,7 +338,11 @@ export const selectTool = (): Tool => {
     });
   };
   /** Adds a copy of `source` next to it in `direction`, joined by an arrow. */
-  const connectNew = (source: ShapeElement, direction: Direction, ctx: ToolContext) => {
+  const connectNew = (
+    source: ShapeElement | TextElement,
+    direction: Direction,
+    ctx: ToolContext,
+  ) => {
     const w = Math.abs(source.width);
     const h = Math.abs(source.height);
     const gap = 90;
@@ -352,7 +364,7 @@ export const selectTool = (): Tool => {
       x += sideways.x;
       y += sideways.y;
     }
-    const shape: ShapeElement = {
+    const item: ShapeElement | TextElement = {
       ...structuredClone(source),
       id: createId(),
       x,
@@ -366,16 +378,26 @@ export const selectTool = (): Tool => {
       groupIds: [],
       locked: false,
     };
-    delete shape.label;
-    delete shape.mindmap;
-    const arrow = arrowBetween(source, centerOf(shape), ctx);
-    arrow.endBinding = { elementId: shape.id };
+    if (item.type === 'text') {
+      // Empty text starts small, centred where a copy of the source would go.
+      const size = textSize('', item.fontSize, item.fontFamily);
+      item.text = '';
+      item.x = x + w / 2 - size.width / 2;
+      item.y = y + h / 2 - size.height / 2;
+      item.width = size.width;
+      item.height = size.height;
+    } else {
+      delete item.label;
+      delete item.mindmap;
+    }
+    const arrow = arrowBetween(source, centerOf(item), ctx);
+    arrow.endBinding = { elementId: item.id };
     ctx.store.beginHistoryGroup();
-    ctx.store.add(shape);
+    ctx.store.add(item);
     ctx.store.add(arrow);
     ctx.store.endHistoryGroup();
-    ctx.appState.update({ selectedIds: new Set([shape.id]) });
-    editLabel(shape, ctx);
+    ctx.appState.update({ selectedIds: new Set([item.id]) });
+    editConnected(ctx, item.id, arrow.id);
   };
   const arrowBetween = (source: Element, to: Point, ctx: ToolContext): LinearElement => {
     const from = centerOf(source);
@@ -509,7 +531,7 @@ export const selectTool = (): Tool => {
           ctx.store.endHistoryGroup();
           ctx.appState.update({ selectedIds: new Set([id]) });
         } else if (isNode(source)) addChildNode(ctx, source.id);
-        else if (isShape(source)) connectNew(source, DIRECTIONS[handle - CONNECT]!, ctx);
+        else if (isConnectable(source)) connectNew(source, DIRECTIONS[handle - CONNECT]!, ctx);
       } else if (mode === 'marquee') {
         const box = {
           minX: Math.min(start.x, current.x),

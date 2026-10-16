@@ -3,8 +3,17 @@ import type { ToolContext } from './types';
 import { fontFamily } from '../render/fonts';
 import { LABEL_PADDING, LINE_HEIGHT, labelMinHeight } from '../core/text';
 import { fitNode, isNode } from '../core/mindmap';
-export type LabelExit = 'done' | 'child';
+/** How an editor was left: finished, Tab for a mind-map child, or Tab to switch box/text. */
+export type EditExit = 'done' | 'child' | 'switch';
+export type LabelExit = EditExit;
+/** An open text editor. */
+export interface Editor {
+  /** Saves the text and closes the editor. */
+  finish(exit: EditExit): void;
+}
 export interface LabelEditOptions {
+  /** Tab leaves the editor with the 'switch' exit (outside mind maps). */
+  switchable?: boolean;
   /** Select the existing text so typing replaces it. */
   selectAll?: boolean;
   /** Called after the label is saved, with how the editor was left. */
@@ -15,7 +24,7 @@ export function editLabel(
   shape: ShapeElement,
   ctx: ToolContext,
   options: LabelEditOptions = {},
-): void {
+): Editor {
   ctx.host.querySelector<HTMLTextAreaElement>('.text-editor')?.blur();
   const node = isNode(shape);
   const s = ctx.appState.value.style;
@@ -60,7 +69,10 @@ export function editLabel(
   place();
   area.addEventListener('input', place);
   let exit: LabelExit = 'done';
+  let closed = false;
   const commit = () => {
+    if (closed) return;
+    closed = true;
     area.removeEventListener('blur', commit);
     const text = node ? area.value.trim() : area.value.trimEnd();
     area.remove();
@@ -85,10 +97,18 @@ export function editLabel(
     ctx.renderer.markDirty();
     options.onDone?.(exit);
   };
+  const finish = (how: EditExit) => {
+    exit = how;
+    if (document.activeElement === area) area.blur();
+    else commit();
+  };
   area.addEventListener('blur', commit);
   area.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
-    if (node && e.key === 'Tab') {
+    if (!node && options.switchable && e.key === 'Tab') {
+      e.preventDefault();
+      finish('switch');
+    } else if (node && e.key === 'Tab') {
       e.preventDefault();
       exit = 'child';
       area.blur();
@@ -105,4 +125,5 @@ export function editLabel(
     if (options.selectAll) area.select();
     else area.setSelectionRange(area.value.length, area.value.length);
   }, 0);
+  return { finish };
 }

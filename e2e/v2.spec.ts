@@ -25,6 +25,7 @@ interface SceneElement {
   height: number;
   isDeleted: boolean;
   label?: { text: string };
+  text?: string;
   mindmap?: MindmapLink;
   points?: [number, number][];
   startBinding?: { elementId: string } | null;
@@ -159,6 +160,54 @@ function trackErrors(page: Page): { pageErrors: string[]; consoleErrors: string[
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
   return { pageErrors, consoleErrors };
+}
+
+const TEXT_EDITOR = 'textarea.text-editor:not(.label-editor)';
+const LABEL_EDITOR = 'textarea.label-editor';
+
+function itemById(elements: SceneElement[], id: string): SceneElement | undefined {
+  return elements.find((element) => element.id === id);
+}
+
+/** Types into an editor once it has focus (the app focuses it on a timer). */
+async function typeInto(page: Page, selector: string, text: string): Promise<void> {
+  await expect(page.locator(selector)).toBeFocused();
+  await page.keyboard.type(text);
+}
+
+/** Where the right-hand quick-connect "+" sits; mirrors connectPoints() in src/tools/select.ts. */
+function rightPlusOf(element: SceneElement): Point {
+  return { x: element.x + element.width + 34, y: element.y + element.height / 2 };
+}
+
+/** Adds a text element with the text tool; it is left selected. */
+async function addText(page: Page, at: Point, text: string): Promise<void> {
+  await page.keyboard.press('t');
+  await clickWorld(page, at);
+  await typeInto(page, TEXT_EDITOR, text);
+  await page.keyboard.press('Escape');
+  await expect(page.locator(TEXT_EDITOR)).toHaveCount(0);
+}
+
+/**
+ * Alpha (0-255) of the interactive canvas at each world point. Selection handles are
+ * opaque white, so a non-zero value means something is drawn there.
+ */
+function overlayAlpha(page: Page, points: Point[]): Promise<number[]> {
+  return page.evaluate(async (worlds) => {
+    // Renders run on animation frames after each change, so wait for the pending one.
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const app = (window as unknown as DDrawWindow).__ddraw.app;
+    const canvas = document.querySelector<HTMLCanvasElement>('canvas.canvas-interactive')!;
+    const context = canvas.getContext('2d')!;
+    const scale = canvas.width / canvas.getBoundingClientRect().width;
+    return worlds.map((world) => {
+      const screen = app.camera.worldToScreen(world);
+      const x = Math.round(screen.x * scale);
+      const y = Math.round(screen.y * scale);
+      return context.getImageData(x, y, 1, 1).data[3]!;
+    });
+  }, points);
 }
 
 test('mind map: Tab adds two children and Delete removes one', async ({ page }) => {
@@ -399,6 +448,278 @@ test('quick connect: "+" adds a bound copy to the right and opens its label', as
       (element) => element.type === 'rectangle' && element.id !== sourceId,
     );
     expect(copy?.label?.text).toBe('Next step');
+  });
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
+
+test('a lone arrow or line shows no box or handles, only its two end dots', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  await test.step('control: a selected box shows a corner handle', async () => {
+    await page.keyboard.press('r');
+    await dragWorld(page, { x: 700, y: 300 }, { x: 800, y: 380 });
+    const [corner] = await overlayAlpha(page, [{ x: 800, y: 300 }]);
+    expect(corner).toBeGreaterThan(0);
+  });
+
+  await test.step('a lone arrow has no box, corner or rotate handles', async () => {
+    await page.keyboard.press('a');
+    await dragWorld(page, { x: 400, y: 300 }, { x: 600, y: 500 });
+    const arrow = (await onCanvas(page)).find((element) => element.type === 'arrow')!;
+    expect((await uiState(page)).selectedIds).toEqual([arrow.id]);
+    // Corners, edge middles and the rotate stem of its box; none lies on the diagonal.
+    const offDiagonal = [
+      { x: 600, y: 300 },
+      { x: 400, y: 500 },
+      { x: 500, y: 300 },
+      { x: 600, y: 400 },
+      { x: 500, y: 500 },
+      { x: 400, y: 400 },
+      { x: 500, y: 276 },
+    ];
+    expect(await overlayAlpha(page, offDiagonal)).toEqual(offDiagonal.map(() => 0));
+    const { start, end } = endsOf(arrow);
+    const [startAlpha, endAlpha] = await overlayAlpha(page, [start, end]);
+    expect(startAlpha).toBeGreaterThan(0);
+    expect(endAlpha).toBeGreaterThan(0);
+  });
+
+  await test.step('a lone line behaves the same way', async () => {
+    await page.keyboard.press('l');
+    await dragWorld(page, { x: 400, y: 600 }, { x: 600, y: 700 });
+    const line = (await onCanvas(page)).find((element) => element.type === 'line')!;
+    expect((await uiState(page)).selectedIds).toEqual([line.id]);
+    const offDiagonal = [
+      { x: 600, y: 600 },
+      { x: 400, y: 700 },
+      { x: 500, y: 600 },
+      { x: 600, y: 650 },
+      { x: 500, y: 700 },
+      { x: 400, y: 650 },
+      { x: 500, y: 576 },
+    ];
+    expect(await overlayAlpha(page, offDiagonal)).toEqual(offDiagonal.map(() => 0));
+    const { start, end } = endsOf(line);
+    const [startAlpha, endAlpha] = await overlayAlpha(page, [start, end]);
+    expect(startAlpha).toBeGreaterThan(0);
+    expect(endAlpha).toBeGreaterThan(0);
+  });
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
+
+test('quick connect on text: "+" adds an empty text joined by an arrow', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  let sourceId = '';
+
+  await test.step('type a text element, which stays selected', async () => {
+    await addText(page, { x: 400, y: 300 }, 'Idea');
+    const source = (await onCanvas(page)).find((element) => element.type === 'text')!;
+    expect(source.text).toBe('Idea');
+    expect((await uiState(page)).selectedIds).toEqual([source.id]);
+    sourceId = source.id;
+  });
+
+  await test.step('"+" adds an empty text to the right and opens it', async () => {
+    const source = itemById(await onCanvas(page), sourceId)!;
+    await clickWorld(page, rightPlusOf(source));
+
+    const elements = await onCanvas(page);
+    const texts = elements.filter((element) => element.type === 'text');
+    expect(texts).toHaveLength(2);
+    const copy = texts.find((element) => element.id !== sourceId)!;
+    expect(copy.text).toBe('');
+    expect(copy.x).toBeGreaterThan(source.x + source.width);
+
+    const arrows = elements.filter((element) => element.type === 'arrow');
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]?.startBinding?.elementId).toBe(sourceId);
+    expect(arrows[0]?.endBinding?.elementId).toBe(copy.id);
+
+    const ui = await uiState(page);
+    expect(ui.selectedIds).toEqual([copy.id]);
+    expect(ui.editingId).toBe(copy.id);
+    await expect(page.locator(TEXT_EDITOR)).toBeFocused();
+    await expect(page.locator('.kind-switch')).toBeVisible();
+  });
+
+  await test.step('typing fills the new text, saved on Escape', async () => {
+    await typeInto(page, TEXT_EDITOR, 'Next');
+    await page.keyboard.press('Escape');
+    await expect(page.locator(TEXT_EDITOR)).toHaveCount(0);
+    const copy = (await onCanvas(page)).find(
+      (element) => element.type === 'text' && element.id !== sourceId,
+    );
+    expect(copy?.text).toBe('Next');
+    expect((await uiState(page)).editingId).toBeNull();
+  });
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
+
+test('kind switch: "Text" in the chip turns a new box into plain text', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  let sourceId = '';
+  let copyId = '';
+
+  await test.step('draw a box, then add a box to its right with "+"', async () => {
+    await page.keyboard.press('r');
+    await dragWorld(page, { x: 300, y: 250 }, { x: 460, y: 350 });
+    const source = (await onCanvas(page)).find((element) => element.type === 'rectangle')!;
+    sourceId = source.id;
+    await clickWorld(page, rightPlusOf(source));
+
+    const copy = (await onCanvas(page)).find(
+      (element) => element.type === 'rectangle' && element.id !== sourceId,
+    );
+    copyId = copy!.id;
+    expect((await uiState(page)).editingId).toBe(copyId);
+    await expect(page.locator(LABEL_EDITOR)).toBeFocused();
+    await expect(page.locator('.kind-switch')).toBeVisible();
+  });
+
+  await test.step('"Text" in the chip turns the box into text and reopens the editor', async () => {
+    await page.locator('.kind-switch button[data-kind="text"]').click();
+    expect(itemById(await onCanvas(page), copyId)?.type).toBe('text');
+    expect((await uiState(page)).editingId).toBe(copyId);
+    await expect(page.locator(TEXT_EDITOR)).toBeFocused();
+    await expect(page.locator('.kind-switch button[data-kind="text"]')).toHaveClass(/active/);
+  });
+
+  await test.step('typed text is saved and the arrow still joins both', async () => {
+    await typeInto(page, TEXT_EDITOR, 'Plain');
+    await page.keyboard.press('Escape');
+    await expect(page.locator(TEXT_EDITOR)).toHaveCount(0);
+    const elements = await onCanvas(page);
+    expect(itemById(elements, copyId)?.text).toBe('Plain');
+    const arrows = elements.filter((element) => element.type === 'arrow');
+    expect(arrows).toHaveLength(1);
+    expect(arrows[0]?.startBinding?.elementId).toBe(sourceId);
+    expect(arrows[0]?.endBinding?.elementId).toBe(copyId);
+  });
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
+
+test('Tab in a new text turns it into a box and opens the box label', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  let copyId = '';
+
+  await test.step('add a text, then a new text to its right with "+"', async () => {
+    await addText(page, { x: 400, y: 300 }, 'Idea');
+    const source = (await onCanvas(page)).find((element) => element.type === 'text')!;
+    await clickWorld(page, rightPlusOf(source));
+    const copy = (await onCanvas(page)).find(
+      (element) => element.type === 'text' && element.id !== source.id,
+    );
+    copyId = copy!.id;
+    await expect(page.locator(TEXT_EDITOR)).toBeFocused();
+  });
+
+  await test.step('Tab turns the empty text into a box and opens its label', async () => {
+    await page.keyboard.press('Tab');
+    await expect(page.locator(LABEL_EDITOR)).toBeFocused();
+    await expect(page.locator(TEXT_EDITOR)).toHaveCount(0);
+    expect(itemById(await onCanvas(page), copyId)?.type).toBe('rectangle');
+    expect((await uiState(page)).editingId).toBe(copyId);
+  });
+
+  await test.step('the typed label is saved and the arrow still joins the box', async () => {
+    await typeInto(page, LABEL_EDITOR, 'Box label');
+    await page.keyboard.press('Escape');
+    await expect(page.locator(LABEL_EDITOR)).toHaveCount(0);
+    const elements = await onCanvas(page);
+    expect(itemById(elements, copyId)?.label?.text).toBe('Box label');
+    const arrows = elements.filter((element) => element.type === 'arrow');
+    expect(arrows[0]?.endBinding?.elementId).toBe(copyId);
+  });
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
+
+test('an empty new text is removed with its arrow when Escape is pressed', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  let sourceId = '';
+  let copyId = '';
+  let arrowId = '';
+
+  await test.step('add a text, then "+" to its right opens an empty text', async () => {
+    await addText(page, { x: 400, y: 300 }, 'Idea');
+    const source = (await onCanvas(page)).find((element) => element.type === 'text')!;
+    sourceId = source.id;
+    await clickWorld(page, rightPlusOf(source));
+    const elements = await onCanvas(page);
+    copyId = elements.find((element) => element.type === 'text' && element.id !== sourceId)!.id;
+    arrowId = elements.find((element) => element.type === 'arrow')!.id;
+    await expect(page.locator(TEXT_EDITOR)).toBeFocused();
+  });
+
+  await test.step('Escape with nothing typed removes the text and its arrow', async () => {
+    await page.keyboard.press('Escape');
+    await expect(page.locator(TEXT_EDITOR)).toHaveCount(0);
+    const elements = await onCanvas(page);
+    expect(elements.map((element) => element.id)).toEqual([sourceId]);
+    const stored = await inStore(page);
+    expect(itemById(stored, copyId)?.isDeleted).toBe(true);
+    expect(itemById(stored, arrowId)?.isDeleted).toBe(true);
+    expect((await uiState(page)).editingId).toBeNull();
+  });
+
+  expect(errors.pageErrors).toEqual([]);
+  expect(errors.consoleErrors).toEqual([]);
+});
+
+test('style bar kind buttons convert a box to text and back in place', async ({ page }) => {
+  const errors = trackErrors(page);
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+
+  const center = { x: 380, y: 300 };
+  let boxId = '';
+
+  await test.step('draw a box, which stays selected with the style bar shown', async () => {
+    await page.keyboard.press('r');
+    await dragWorld(page, { x: 300, y: 250 }, { x: 460, y: 350 });
+    boxId = (await onCanvas(page)).find((element) => element.type === 'rectangle')!.id;
+    await expect(page.locator('.style-bar')).toBeVisible();
+  });
+
+  await test.step('"Plain text" turns the box into text in place', async () => {
+    await page.locator('.style-bar [data-action="kind:text"]').click();
+    const item = itemById(await onCanvas(page), boxId)!;
+    expect(item.type).toBe('text');
+    expect(centerOf(item).x).toBeCloseTo(center.x);
+    expect(centerOf(item).y).toBeCloseTo(center.y);
+    expect((await uiState(page)).selectedIds).toEqual([boxId]);
+  });
+
+  await test.step('"Box" turns the text back into a box in place', async () => {
+    await page.locator('.style-bar [data-action="kind:box"]').click();
+    const item = itemById(await onCanvas(page), boxId)!;
+    expect(item.type).toBe('rectangle');
+    expect(centerOf(item).x).toBeCloseTo(center.x);
+    expect(centerOf(item).y).toBeCloseTo(center.y);
+    expect((await uiState(page)).selectedIds).toEqual([boxId]);
   });
 
   expect(errors.pageErrors).toEqual([]);

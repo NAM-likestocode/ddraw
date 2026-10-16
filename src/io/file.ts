@@ -31,11 +31,23 @@ export function serialize(
   appState: AppStateData,
   files: Record<string, FileRecord>,
 ): string {
+  // Text still being typed can be empty; leave it, and arrows to it, out of the file.
+  const empty = new Set(
+    elements.filter((e) => e.type === 'text' && !e.text.trim()).map((e) => e.id),
+  );
+  const bound = (b: { elementId: string } | null | undefined) => !!b && empty.has(b.elementId);
   return JSON.stringify({
     type: 'ddraw',
     version: FILE_VERSION,
     source: 'ddraw',
-    elements,
+    elements: elements.filter(
+      (e) =>
+        !empty.has(e.id) &&
+        !(
+          (e.type === 'arrow' || e.type === 'line') &&
+          (bound(e.startBinding) || bound(e.endBinding))
+        ),
+    ),
     appState: {
       viewBackgroundColor: appState.viewBackgroundColor,
       gridEnabled: appState.gridEnabled,

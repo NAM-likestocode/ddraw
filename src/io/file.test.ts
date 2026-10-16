@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { deserialize, serialize } from './file';
 import { DEFAULT_APP_STATE } from '../core/types';
-import type { ShapeElement } from '../core/types';
+import type { Element, ShapeElement } from '../core/types';
 import { arrow, shape } from '../test/fixtures';
 it('round trips ddraw files', () => {
   const element: ShapeElement = {
@@ -60,4 +60,13 @@ it('opens version 1 files and refuses newer ones', () => {
   expect(r).not.toHaveProperty('label');
   const newer = JSON.stringify({ type: 'ddraw', version: 99, elements: [] });
   expect(() => deserialize(newer)).toThrow(/newer/);
+});
+it('leaves out empty text and the arrows attached to it', () => {
+  const blank = { ...shape('t', 0, 0), type: 'text', text: ' ' } as unknown as Element;
+  const json = serialize(
+    [shape('r', 0, 0), blank, arrow('a', 'r', 't'), arrow('b', 'r', null)],
+    DEFAULT_APP_STATE(),
+    {},
+  );
+  expect(deserialize(json).elements.map((e) => e.id)).toEqual(['r', 'b']);
 });

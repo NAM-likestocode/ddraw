@@ -3,6 +3,7 @@ import type { Camera } from '../core/camera';
 import type { Element, FillStyle } from '../core/types';
 import { selectionBounds } from '../core/geometry';
 import { isNode } from '../core/mindmap';
+import { convertItem, kindOf } from '../core/convert';
 import { icon } from './icons';
 
 interface Preset {
@@ -76,6 +77,11 @@ export function createStyleBar(
     const stroked = [...types].some((t) => STROKED.has(t));
     const sketchable = [...types].some((t) => t !== 'freedraw' && STROKED.has(t));
     const parts: string[] = [];
+    const kind = list.length === 1 ? kindOf(first) : null;
+    if (kind)
+      parts.push(
+        `<div class="style-group seg-pill">${button('kind:box', 'Box', icon('rectangle', 16).outerHTML, kind === 'box')}${button('kind:text', 'Plain text', icon('text', 16).outerHTML, kind === 'text')}</div>`,
+      );
     if (stroked || types.has('text'))
       parts.push(
         `<div class="style-group">${PRESETS.map((p) =>
@@ -149,7 +155,7 @@ export function createStyleBar(
     const key = list
       .map(
         (e) =>
-          `${e.id}:${e.strokeColor}:${e.backgroundColor}:${e.fillStyle}:${e.roughness}:${e.strokeWidth}`,
+          `${e.id}:${e.type}:${e.strokeColor}:${e.backgroundColor}:${e.fillStyle}:${e.roughness}:${e.strokeWidth}`,
       )
       .join('|');
     if (key !== shown) {
@@ -166,7 +172,9 @@ export function createStyleBar(
     if (!action) return;
     const first = selected()[0];
     if (!first) return;
-    if (action.startsWith('preset:')) {
+    if (action === 'kind:box' || action === 'kind:text') {
+      convertItem(store, first.id, action === 'kind:box' ? 'box' : 'text', state.value.style);
+    } else if (action.startsWith('preset:')) {
       const p = PRESETS.find((x) => `preset:${x.name}` === action)!;
       apply(
         (el) => {

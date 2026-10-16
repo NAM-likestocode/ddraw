@@ -77,3 +77,12 @@ export function labelMinHeight(shape: ShapeElement): number {
   const textHeight = labelLines(shape).length * label.fontSize * LINE_HEIGHT;
   return textHeight / usableRatio(shape.type) + LABEL_PADDING * 2;
 }
+/** Size of a text element holding `text`, kept wide enough to click. */
+export function textSize(
+  text: string,
+  fontSize: number,
+  family: FontFamily,
+): { width: number; height: number } {
+  const measured = measureText(text || ' ', fontSize, family);
+  return { width: Math.max(40, measured.width), height: measured.height };
+}

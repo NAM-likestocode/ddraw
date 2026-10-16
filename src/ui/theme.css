@@ -722,6 +722,47 @@ button:disabled {
 .seg-pill button {
   height: 24px;
 }
+.kind-switch {
+  position: absolute;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px #090b1099;
+  animation: style-bar-in 120ms ease-out;
+}
+.kind-switch button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  min-height: 0;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+}
+.kind-switch button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.kind-switch button.active {
+  background: var(--surface-btn);
+  color: var(--accent);
+}
+.kind-switch kbd {
+  padding: 0 6px;
+  color: var(--text-2);
+  font-size: 11px;
+  opacity: 0.7;
+}
 .fill-swatch {
   width: 16px;
   height: 16px;

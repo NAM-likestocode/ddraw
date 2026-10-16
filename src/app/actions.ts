@@ -14,6 +14,7 @@ import {
 import { addChildNode, addSiblingNode, renameNode, startMindmap } from '../tools/mindmap';
 import { editLabel } from '../tools/labelEditor';
 import { editTextAt } from '../tools/text';
+import { convertItem, kindOf } from '../core/convert';
 
 export type ActionSection =
   'Text' | 'Mind map' | 'Edit' | 'Align' | 'Arrange' | 'Canvas' | 'Tools' | 'View' | 'File';
@@ -125,6 +126,26 @@ export function createActions(host: ActionHost): Action[] {
         else if (one.type === 'text') editTextAt(one.x, one.y, host.ctx, one);
         else if (isShape(one)) editLabel(one, host.ctx);
       },
+    },
+    {
+      id: 'to-text',
+      label: 'Turn into plain text',
+      section: 'Text',
+      icon: 'text',
+      keywords: 'convert box shape switch',
+      menu: 'selection',
+      enabled: () => kindOf(single()) === 'box',
+      run: () => convertItem(host.ctx.store, single()!.id, 'text', host.ctx.appState.value.style),
+    },
+    {
+      id: 'to-box',
+      label: 'Turn into a box',
+      section: 'Text',
+      icon: 'rectangle',
+      keywords: 'convert text shape switch rectangle',
+      menu: 'selection',
+      enabled: () => kindOf(single()) === 'text',
+      run: () => convertItem(host.ctx.store, single()!.id, 'box', host.ctx.appState.value.style),
     },
     {
       id: 'topic-child',

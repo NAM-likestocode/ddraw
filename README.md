@@ -27,7 +27,9 @@ Inspired by [Excalidraw](https://excalidraw.com), built from scratch on a plain 
 
 - Double-click any shape to write text inside it
 - Arrows attach to shapes and follow them when they move
-- Hover a selected shape and click a `+` to add a connected copy in one step
+- Hover a selected shape or text and click a `+` to add a connected item in one step; while typing, press `Tab` or use the switch above it to make it a box or plain text
+- Turn any box into plain text (or back) later from the style bar or the right-click menu
+- A selected arrow shows just its two end dots; drag one to reattach it
 - Shapes snap to each other's edges and centres while you drag (hold `Alt` to turn it off)
 - Duplicate (`Ctrl+D`) and copy/paste keep arrows, groups, and mind-map branches connected
 - Right-click for the actions that fit what you clicked, including align and distribute
@@ -124,31 +126,32 @@ See [`server/README.md`](server/README.md) for configuration, reverse-proxy, and
 
 ## Keyboard shortcuts
 
-| Shortcut              | Action                        |
-| --------------------- | ----------------------------- |
-| `V` / `1`             | Select                        |
-| `R` / `D` / `O`       | Rectangle / diamond / ellipse |
-| `A` / `L` / `P`       | Arrow / line / pen            |
-| `E` / `0`             | Eraser                        |
-| `T` / `I` / `H`       | Text / image / hand           |
-| `M`                   | Mind map                      |
-| `Tab` / `Enter`       | Add child / sibling topic     |
-| `F2` or double-click  | Write text in a shape         |
-| `Ctrl+K`              | Search all commands           |
-| Right-click           | Quick actions menu            |
-| `Ctrl+D`              | Duplicate                     |
-| `Ctrl+Shift+]` / `[`  | Bring to front / send to back |
-| `Alt` + drag          | Move without snapping         |
-| `Ctrl` + draw arrow   | Arrow that doesn't attach     |
-| `Space` + drag        | Pan                           |
-| `Ctrl` + wheel        | Zoom                          |
-| `Ctrl+Z`              | Undo                          |
-| `Shift+1` / `Shift+2` | Fit canvas / selection        |
-| `Ctrl+Shift+E`        | Export image                  |
-| `Ctrl+Shift+C`        | Copy selection as PNG         |
-| `Delete`              | Remove selection              |
-| `Q`                   | Keep current tool active      |
-| `?`                   | Show shortcut help            |
+| Shortcut                | Action                        |
+| ----------------------- | ----------------------------- |
+| `V` / `1`               | Select                        |
+| `R` / `D` / `O`         | Rectangle / diamond / ellipse |
+| `A` / `L` / `P`         | Arrow / line / pen            |
+| `E` / `0`               | Eraser                        |
+| `T` / `I` / `H`         | Text / image / hand           |
+| `M`                     | Mind map                      |
+| `Tab` / `Enter`         | Add child / sibling topic     |
+| `F2` or double-click    | Write text in a shape         |
+| `Tab` on a new `+` item | Switch box / plain text       |
+| `Ctrl+K`                | Search all commands           |
+| Right-click             | Quick actions menu            |
+| `Ctrl+D`                | Duplicate                     |
+| `Ctrl+Shift+]` / `[`    | Bring to front / send to back |
+| `Alt` + drag            | Move without snapping         |
+| `Ctrl` + draw arrow     | Arrow that doesn't attach     |
+| `Space` + drag          | Pan                           |
+| `Ctrl` + wheel          | Zoom                          |
+| `Ctrl+Z`                | Undo                          |
+| `Shift+1` / `Shift+2`   | Fit canvas / selection        |
+| `Ctrl+Shift+E`          | Export image                  |
+| `Ctrl+Shift+C`          | Copy selection as PNG         |
+| `Delete`                | Remove selection              |
+| `Q`                     | Keep current tool active      |
+| `?`                     | Show shortcut help            |
 
 On macOS, use `Cmd` instead of `Ctrl`.
 
