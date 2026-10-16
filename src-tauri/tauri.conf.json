@@ -30,7 +30,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": "all",
+    "category": "GraphicsAndDesign",
+    "shortDescription": "Hand-drawn-style whiteboard",
+    "longDescription": "A fast, hand-drawn-style whiteboard for sketching diagrams, wireframes, and ideas, with optional real-time collaboration.",
     "fileAssociations": [
       {
         "ext": ["ddraw"],

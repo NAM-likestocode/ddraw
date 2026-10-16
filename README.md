@@ -1,6 +1,6 @@
 # Ddraw
 
-A fast, hand-drawn-style whiteboard for sketching diagrams, wireframes, and ideas. Ddraw runs in any modern browser or as a lightweight native desktop app for Windows, and supports optional real-time collaboration.
+A fast, hand-drawn-style whiteboard for sketching diagrams, wireframes, and ideas. Ddraw runs in any modern browser or as a lightweight native desktop app for Windows and Linux, and supports optional real-time collaboration.
 
 Inspired by [Excalidraw](https://excalidraw.com), built from scratch on a plain HTML canvas with TypeScript — no UI framework.
 
@@ -32,6 +32,19 @@ Inspired by [Excalidraw](https://excalidraw.com), built from scratch on a plain 
 - Live cursors and selections for everyone in the room
 - Small self-hostable server (Node.js or Docker)
 
+## Download
+
+Get the latest desktop app from the [Releases page](https://github.com/NAM-likestocode/ddraw/releases/latest):
+
+| System               | File                                          |
+| -------------------- | --------------------------------------------- |
+| Windows              | `Ddraw_<version>_x64-setup.exe` (or `.msi`)   |
+| Debian, Ubuntu, Mint | `.deb`                                        |
+| Fedora, openSUSE     | `.rpm`                                        |
+| Any other Linux      | `.AppImage` (make it executable, then run it) |
+
+The installers aren't code-signed yet, so Windows may show an "unknown publisher" warning the first time — choose **More info → Run anyway**.
+
 ## Getting started
 
 Requires [Node.js](https://nodejs.org) 20 or newer.
@@ -45,16 +58,30 @@ npm run dev
 
 Then open the URL Vite prints (by default `http://localhost:1420`).
 
-## Desktop app (Windows)
+## Desktop app
 
-The desktop app is built with [Tauri](https://tauri.app). In addition to Node.js you'll need the [Rust toolchain](https://rustup.rs). It uses Microsoft WebView2, which ships with current Windows 10/11 (the installer can install it if missing).
+The desktop app is built with [Tauri](https://tauri.app). In addition to Node.js you'll need the [Rust toolchain](https://rustup.rs).
+
+- **Windows:** uses Microsoft WebView2, which ships with current Windows 10/11 (the installer can install it if missing).
+- **Linux:** install the system libraries listed in the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/#linux) (WebKitGTK 4.1 and friends).
 
 ```sh
 npm run tauri dev     # run the desktop app in development
-npm run tauri build   # build a release
+npm run tauri build   # build installers for the current system
 ```
 
-The executable is written to `src-tauri/target/release/`, and NSIS and MSI installers to `src-tauri/target/release/bundle/`.
+Installers are written to `src-tauri/target/release/bundle/`: NSIS and MSI on Windows; deb, rpm, and AppImage on Linux.
+
+### Publishing a release
+
+Releases are built automatically by GitHub Actions. Bump `version` in `package.json` and `src-tauri/tauri.conf.json`, commit, then push a matching tag:
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The workflow builds Windows and Linux installers and publishes them as a GitHub release.
 
 ## Real-time collaboration
 
