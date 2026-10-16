@@ -32,8 +32,8 @@
     "active": true,
     "targets": "all",
     "category": "GraphicsAndDesign",
-    "shortDescription": "Hand-drawn-style whiteboard",
-    "longDescription": "A fast, hand-drawn-style whiteboard for sketching diagrams, wireframes, and ideas, with optional real-time collaboration.",
+    "shortDescription": "Whiteboard for diagrams and sketches",
+    "longDescription": "A fast whiteboard for sketching diagrams, wireframes, and ideas, with optional real-time collaboration.",
     "fileAssociations": [
       {
         "ext": ["ddraw"],

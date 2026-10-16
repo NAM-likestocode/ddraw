@@ -1,6 +1,6 @@
 # Ddraw
 
-A fast, hand-drawn-style whiteboard for sketching diagrams, wireframes, and ideas. Ddraw runs in any modern browser or as a lightweight native desktop app for Windows and Linux, and supports optional real-time collaboration.
+A fast whiteboard for sketching diagrams, wireframes, and ideas. Ddraw runs in any modern browser or as a lightweight native desktop app for Windows and Linux, and supports optional real-time collaboration.
 
 Inspired by [Excalidraw](https://excalidraw.com), built from scratch on a plain HTML canvas with TypeScript — no UI framework.
 
@@ -9,7 +9,7 @@ Inspired by [Excalidraw](https://excalidraw.com), built from scratch on a plain 
 **Drawing**
 
 - Rectangles, diamonds, ellipses, arrows, lines, freehand pen strokes, text, and images
-- Hand-drawn look with adjustable roughness, plus solid, hachure, and cross-hatch fills
+- Solid or transparent fills, with a handwritten font for text
 - Stroke color, width, and style (solid, dashed, dotted), opacity, rounded or sharp corners
 - Arrowheads (arrow, bar, dot) on either end of lines and arrows
 - Eraser tool, and a pen that stays active for continuous sketching
