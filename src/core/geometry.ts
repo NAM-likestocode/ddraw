@@ -68,21 +68,21 @@ export function hitTest(el: Element, p: Point, tolerance = 5): boolean {
     }
     return false;
   }
+  // Shapes with text inside can be grabbed anywhere, like filled ones.
+  const solid = el.fillStyle !== 'none' || Boolean('label' in el && el.label?.text);
   if (el.type === 'ellipse') {
     const rx = Math.abs(w) / 2;
     const ry = Math.abs(h) / 2;
     if (!rx || !ry) return false;
     const v = ((lx - w / 2) / rx) ** 2 + ((ly - h / 2) / ry) ** 2;
-    return el.fillStyle !== 'none' ? v <= 1 : Math.abs(v - 1) <= (tolerance / Math.max(rx, ry)) * 2;
+    return solid ? v <= 1 : Math.abs(v - 1) <= (tolerance / Math.max(rx, ry)) * 2;
   }
   if (el.type === 'diamond') {
     const v = Math.abs((lx - w / 2) / (w / 2 || 1)) + Math.abs((ly - h / 2) / (h / 2 || 1));
-    return el.fillStyle !== 'none'
-      ? v <= 1
-      : Math.abs(v - 1) < (tolerance / Math.min(Math.abs(w), Math.abs(h))) * 2;
+    return solid ? v <= 1 : Math.abs(v - 1) < (tolerance / Math.min(Math.abs(w), Math.abs(h))) * 2;
   }
   const inside = lx >= -tolerance && lx <= w + tolerance && ly >= -tolerance && ly <= h + tolerance;
-  if (el.type === 'text' || el.type === 'image' || el.fillStyle !== 'none') return inside;
+  if (el.type === 'text' || el.type === 'image' || solid) return inside;
   return (
     inside && (lx <= tolerance || lx >= w - tolerance || ly <= tolerance || ly >= h - tolerance)
   );
